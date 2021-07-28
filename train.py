@@ -1,24 +1,8 @@
-
-# %% introduction
-# ich means Image Classification Hammer, used for imgae classification task.
-# Developed in vscode with interactive features
-
-'''  
-# p1
-- add resume
-
-
-# p9
-- add tensorboard
-- unify data
-
-
-# logs
-- v7 add checkpoint 
-- v6 save last.pt and best.pt
-'''
 # %% preset
 
+
+import yaml
+import os
 import pandas as pd
 import numpy as np
 import argparse
@@ -84,6 +68,7 @@ def test(loader,
         running_loss = 0.0
         running_corrects = 0
         cols = ('','','val_loss','val_acc')
+        # cols = ('val_loss','val_acc','','')
     else:
         logger.info("Predicting test dataset...")
         device = torch.device('cuda:0' if torch.cuda.is_available()  else 'cpu')
@@ -118,6 +103,7 @@ def test(loader,
             epoch_loss = running_loss / len(loader.dataset)
             epoch_acc = running_corrects.double() / len(loader.dataset)
             s = ('%30.4g' + '%10.4g' * 1) % (epoch_loss,epoch_acc)
+            # s = ('%10.4g' + '%10.4g' * 1) % (epoch_loss,epoch_acc)
             logging.info(s)
             val_acc = epoch_acc
 
@@ -322,31 +308,45 @@ class Net(nn.Module):
 
 # begin
 parser = argparse.ArgumentParser()
-parser.add_argument('--placeholder', type=str,
-                    default='blank', help='initial weights path')
+parser.add_argument('--weights', type=str, default='', help='initial weights path')
 parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
 parser.add_argument('--notest', action='store_true', help='only test final epoch')
 parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
+parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')
+
 opt = parser.parse_args(args=[])
 
-
 # default opt
+
+
 opt.nosave = False
 opt.notest = False
 opt.evolve = False
 opt.project = 'runs_train'
 opt.name = 'exp'
-
-# explicit opt
-opt.batch = 512
+opt.batch = 64
 opt.split = 0.8
 opt.workers = 2
-opt.epochs = 3
+opt.epochs = 20
 opt.save_dir = str(increment_path(Path(opt.project) / opt.name))
+# opt.weights = 'runs_train/exp75/weights/last.pt'
+opt.resume = 'runs_train/exp76/weights/last.pt'
 
 
+# Resume opt
+if opt.resume:
+    ckpt = opt.resume if isinstance(opt.resume, str) else None
+    print('ckpt:',ckpt)
+    assert os.path.isfile(ckpt), 'ERROR: --resume checkpoint does not exist'
+    with open(Path(ckpt).parent.parent / 'opt.yaml') as f:
+        opt = argparse.Namespace(**yaml.safe_load(f))  # replace
+        opt.weights = ckpt
+        print(opt)
+    logger.info('Resuming training from %s' % ckpt)
 
+# load opt
 logger.info('[+]opt\n' + json.dumps(opt.__dict__, sort_keys=True) )
+weights = opt.weights
 split_dot = opt.split  
 workers = opt.workers
 batch_size = opt.batch
@@ -354,19 +354,21 @@ epochs = opt.epochs
 save_dir = Path(opt.save_dir)
 wdir = save_dir / 'weights'
 
+# Directories
 wdir.mkdir(parents=True, exist_ok=True)  # make dir
 last = wdir / 'last.pt'
 best = wdir / 'best.pt'
 results_file = save_dir / 'results.txt'
 
 
-info ={}
-# clean tqdm 
-try:
-    tqdm._instances.clear()
-except Exception:
-    pass
+# Save run settings
+# with open(save_dir / 'hyp.yaml', 'w') as f:
+#     yaml.safe_dump(hyp, f, sort_keys=False)
+with open(save_dir / 'opt.yaml', 'w') as f:
+    yaml.safe_dump(vars(opt), f, sort_keys=False)
 
+
+ 
 
 
 # GPU info
@@ -386,7 +388,7 @@ logger.info(msg)
 
 
 # Prepare datasets
-logger.info('\n[+]load')
+logger.info('\n[+]load dataset')
 transform = transforms.Compose(
     [transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -409,28 +411,73 @@ testloader = torch.utils.data.DataLoader(raw_test, batch_size=batch_size,
 
 dataset_sizes ={'train':len(trainset),"val":len(validset),"test":len(raw_test)}
 # info['dataset_size'] = dataset_sizes
-logger.info("Dataset info > split_dot:{}, train/test={}/{}, classes_count: {}, batch_size:{}".format(
+logger.info("split_dot:{}, train/test={}/{} \n classes_count: {}, batch_size:{}".format(
     split_dot,len(raw_train),len(raw_test),len(classes),batch_size
 ))
 logger.info("Dataset loaded.")
 
-# Prepare Model
-model = Net()
-model.to(device)
+
+
+
+# Load model
+logger.info('\n[+]load model')
+pretrained = weights.endswith('.pt')
+if pretrained:
+    ckpt = torch.load(weights, map_location=device)  # load checkpoint
+    model = Net()  # create
+    state_dict = ckpt['model'].float().state_dict()  # to FP32
+    model.load_state_dict(state_dict, strict=False)  # load
+    model.to(device)
+    logger.info('Transferred %g/%g items from %s' % (len(state_dict), len(model.state_dict()), weights))  # report
+else:
+    model = Net()
+    model.to(device)
+
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-scheduler = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 logger.info('Model loaded.')
 
 
 
-# train
+# Resume model
+start_epoch, best_acc = 0, 0.0
+if pretrained:
+    # Optimizer
+    if ckpt['optimizer_state_dict'] is not None:
+        optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+        best_acc = ckpt['best_acc']
+
+    # Results
+    if ckpt.get('training_results') is not None:
+        results_file.write_text(ckpt['training_results'])  # write results.txt
+
+    # Epochs
+    start_epoch = ckpt['epoch'] + 1
+    if opt.resume:
+        assert start_epoch > 0, '%s training to %g epochs is finished, nothing to resume.' % (weights, epochs)
+    
+    # Start Training
+    logger.info('ckpt epoch '+str(ckpt['epoch']))
+    del ckpt, state_dict
+
+
+
+
+# Start Training
 logger.info('\n[+]train')
+logger.info('Logging results to ' + str(save_dir))
 logger.info('Starting training for {} epochs...'.format(epochs))
+# clean tqdm 
+try:
+    tqdm._instances.clear()
+except Exception:
+    pass
 since = time.time()
 best_model_wts = copy.deepcopy(model.state_dict())
-best_acc = 0.0
-for epoch in range(epochs):
+# scheduler
+scheduler = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+scheduler.last_epoch = start_epoch - 1  # do not move
+for epoch in range(start_epoch,epochs):
     logging.info("")
     final_epoch = epoch + 1 == epochs
     # Each epoch has a training and validation phase
@@ -496,6 +543,7 @@ for epoch in range(epochs):
             'model': deepcopy(model).half(),
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': epoch_loss,
+            'best_acc': best_acc,
         }
         torch.save(ckpt, last)
         if this_best:
@@ -505,8 +553,8 @@ for epoch in range(epochs):
 
 
 time_elapsed = time.time() - since
-print('{} epochs complete in {:.0f}m {:.0f}s \n'.format(
-    epochs, time_elapsed // 60, time_elapsed % 60))
+print('{} epochs completed in {:.0f}m {:.0f}s \n'.format(
+    epochs - start_epoch , time_elapsed // 60, time_elapsed % 60)) # epoch should + 1?
 print('Best val Acc: {:4f}'.format(best_acc))
 
 
