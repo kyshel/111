@@ -1,6 +1,7 @@
 # %% preset
 
-
+ 
+from torch.utils.tensorboard import SummaryWriter
 import yaml
 import os
 import pandas as pd
@@ -33,7 +34,7 @@ import  itertools
 import sys
 import logging
 reload(util)
-from util import increment_path,strip_optimizer
+from util import increment_path,strip_optimizer,colorstr
 from pathlib import Path
 
 logging.basicConfig(
@@ -106,6 +107,7 @@ def test(loader,
             # s = ('%10.4g' + '%10.4g' * 1) % (epoch_loss,epoch_acc)
             logging.info(s)
             val_acc = epoch_acc
+            val_loss = epoch_loss
 
   
     # savecsv
@@ -132,7 +134,7 @@ def test(loader,
         df.to_csv(csv_fp, encoding='utf-8', index=False)
         logger.info('done! check: '+ csv_fp )
 
-    return pred_list,val_acc
+    return pred_list,val_acc,val_loss
 
 
 # rm
@@ -311,46 +313,71 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--weights', type=str, default='', help='initial weights path')
 parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
 parser.add_argument('--notest', action='store_true', help='only test final epoch')
+parser.add_argument('--strip', action='store_true', help='only test final epoch')
 parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
 parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')
-
+parser.add_argument('--name', default='exp', help='save to project/name')
 opt = parser.parse_args(args=[])
 
 # default opt
 
-
+opt.strip = False
 opt.nosave = False
 opt.notest = False
 opt.evolve = False
-opt.project = 'runs_train'
+opt.project = 'runs_emoji_train'
 opt.name = 'exp'
 opt.batch = 64
 opt.split = 0.8
 opt.workers = 2
-opt.epochs = 20
+opt.epochs = 3
 opt.save_dir = str(increment_path(Path(opt.project) / opt.name))
-# opt.weights = 'runs_train/exp75/weights/last.pt'
-opt.resume = 'runs_train/exp76/weights/last.pt'
+# opt.weights = 'runs_train/exp76/weights/best.pt'
+# opt.resume = 'runs_train/exp76/weights/last.pt'
 
 
+logger.info('\n[+]log')
 # Resume opt
 if opt.resume:
     ckpt = opt.resume if isinstance(opt.resume, str) else None
-    print('ckpt:',ckpt)
+    # print('ckpt:',ckpt)
     assert os.path.isfile(ckpt), 'ERROR: --resume checkpoint does not exist'
     with open(Path(ckpt).parent.parent / 'opt.yaml') as f:
         opt = argparse.Namespace(**yaml.safe_load(f))  # replace
         opt.weights = ckpt
-        print(opt)
     logger.info('Resuming training from %s' % ckpt)
 
+
+# Tensorboard
+# prefix = colorstr('tensorboard: ')
+# logger.info(f"{prefix}Start with 'tensorboard --logdir {opt.project}', view at http://localhost:6006/")
+# tb_writer = SummaryWriter(opt.save_dir)  # Tensorboard
+
+# %%
+# wandb
+
+wandb = util.wandb
+if wandb:
+    is_wandb_login = wandb.login()
+else:
+    logger.info('You can install  wandb by: pip install wandb')
+
+# wandb = util.wandb
+# a =wandb.login()
+
+print('is_wandb_login:',is_wandb_login)
+
+
+
+ 
 # load opt
-logger.info('[+]opt\n' + json.dumps(opt.__dict__, sort_keys=True) )
+logger.info('\n[+]opt\n' + json.dumps(opt.__dict__, sort_keys=True) )
 weights = opt.weights
 split_dot = opt.split  
 workers = opt.workers
 batch_size = opt.batch
 epochs = opt.epochs
+strip = opt.strip
 save_dir = Path(opt.save_dir)
 wdir = save_dir / 'weights'
 
@@ -411,12 +438,18 @@ testloader = torch.utils.data.DataLoader(raw_test, batch_size=batch_size,
 
 dataset_sizes ={'train':len(trainset),"val":len(validset),"test":len(raw_test)}
 # info['dataset_size'] = dataset_sizes
-logger.info("split_dot:{}, train/test={}/{} \n classes_count: {}, batch_size:{}".format(
+logger.info("split_dot:{}, train/test={}/{} \nclasses_count: {}, batch_size:{}".format(
     split_dot,len(raw_train),len(raw_test),len(classes),batch_size
 ))
+
+labels = raw_train.targets
+c = torch.tensor(labels[:])  # classes
+# tb_writer.add_histogram('classes', c, 0)
+
+
 logger.info("Dataset loaded.")
 
-
+ 
 
 
 # Load model
@@ -430,6 +463,7 @@ if pretrained:
     model.to(device)
     logger.info('Transferred %g/%g items from %s' % (len(state_dict), len(model.state_dict()), weights))  # report
 else:
+    logger.info('Building Model from scratch...')
     model = Net()
     model.to(device)
 
@@ -455,10 +489,17 @@ if pretrained:
     start_epoch = ckpt['epoch'] + 1
     if opt.resume:
         assert start_epoch > 0, '%s training to %g epochs is finished, nothing to resume.' % (weights, epochs)
-    
-    # Start Training
-    logger.info('ckpt epoch '+str(ckpt['epoch']))
+    if epochs < start_epoch: # will never run cause strip_opti set to -1
+        logger.info('%s has been trained for %g epochs. Fine-tuning for %g additional epochs.' %
+                    (weights, ckpt['epoch'], epochs))
+        epochs += ckpt['epoch']  # finetune additional epochs
+
     del ckpt, state_dict
+
+
+
+
+
 
 
 
@@ -517,6 +558,8 @@ for epoch in range(start_epoch,epochs):
         s = ('%10s' * 2 + '%10.4g' * 2) % (
             '%g/%g' % (epoch, epochs - 1), mem ,mloss,macc    )
         pbar.set_description(s, refresh=False)
+        imgs = inputs
+        # tb_writer.add_graph(torch.jit.trace(model, imgs, strict=False), [])  # add model graph
         # end batch  -----------------
     epoch_loss = running_loss / len(trainloader.dataset)
     epoch_acc = running_corrects.double() / len(trainloader.dataset)
@@ -524,7 +567,7 @@ for epoch in range(start_epoch,epochs):
     
     # Validate
     this_best = False
-    pred_list,val_acc = test(validloader,
+    pred_list,val_acc,val_loss = test(validloader,
         model,
         is_training = True,
         criterion = criterion,
@@ -535,6 +578,15 @@ for epoch in range(start_epoch,epochs):
         best_model = copy.deepcopy(model)
         best_model_wts = copy.deepcopy(model.state_dict())
         this_best = True
+    
+    # Log
+    wandb.log({
+        "train_loss":epoch_loss,
+        "val_loss":val_loss,
+        "train_acc":epoch_acc,
+        "val_acc":val_acc,
+        "lr":optimizer.param_groups[0]['lr'],
+    })
         
     # Save
     if (not opt.nosave) or (final_epoch and not opt.evolve):
@@ -558,16 +610,20 @@ print('{} epochs completed in {:.0f}m {:.0f}s \n'.format(
 print('Best val Acc: {:4f}'.format(best_acc))
 
 
-# Strip optimizers
+# Save weights
 final = best if best.exists() else last  # final model
-for f in last, best:
-    if f.exists():
-        strip_optimizer(f)  # strip optimizers
-        print(f)
+if not strip:
+    for f in last, best:
+        if f.exists():
+            mb = os.path.getsize(f) / 1E6  # filesize
+            print(f"Weights saved as {f},{mb:.1f}MB")
+else:
+    for f in last, best:
+        if f.exists():
+            strip_optimizer(f)  # strip optimizers
 
 
-
-
+wandb.finish()
 # torch.cuda.empty_cache()
 
 # %% test
