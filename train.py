@@ -74,7 +74,7 @@ def test(loader,
         logger.info("Predicting test dataset...")
         device = torch.device('cuda:0' if torch.cuda.is_available()  else 'cpu')
 
-    val_acc = 0
+    val_acc,val_loss = 0,0
     pred_list = []
     
     model.eval()
@@ -326,17 +326,16 @@ opt.nosave = False
 opt.notest = False
 opt.evolve = False
 opt.project = 'runs_emoji_train'
-opt.name = 'exp'
 opt.batch = 64
 opt.split = 0.8
 opt.workers = 2
-opt.epochs = 3
+opt.epochs = 10
 opt.save_dir = str(increment_path(Path(opt.project) / opt.name))
 # opt.weights = 'runs_train/exp76/weights/best.pt'
 # opt.resume = 'runs_train/exp76/weights/last.pt'
 
 
-logger.info('\n[+]log')
+
 # Resume opt
 if opt.resume:
     ckpt = opt.resume if isinstance(opt.resume, str) else None
@@ -347,26 +346,35 @@ if opt.resume:
         opt.weights = ckpt
     logger.info('Resuming training from %s' % ckpt)
 
-
+# log
+logger.info('\n[+]log')
 # Tensorboard
 # prefix = colorstr('tensorboard: ')
 # logger.info(f"{prefix}Start with 'tensorboard --logdir {opt.project}', view at http://localhost:6006/")
 # tb_writer = SummaryWriter(opt.save_dir)  # Tensorboard
 
 # %%
-# wandb
 
+
+# wandb
+name_inc = os.path.normpath(opt.save_dir).split(os.path.sep)[-1]
 wandb = util.wandb
 if wandb:
+    logger.info("Wandb login ...")
     is_wandb_login = wandb.login()
+    # init wandb
+    wandb.init(
+        # Set entity to specify your username or team name
+        # ex: entity="carey",
+        # Set the project where this run will be logged
+        project=opt.project, 
+        # Track hyperparameters and run metadata
+        config=dict(opt.__dict__),
+        name=name_inc,
+    )
+
 else:
-    logger.info('You can install  wandb by: pip install wandb')
-
-# wandb = util.wandb
-# a =wandb.login()
-
-print('is_wandb_login:',is_wandb_login)
-
+    logger.info('Wandb not installed, manual install: pip install wandb')
 
 
  
@@ -495,7 +503,6 @@ if pretrained:
         epochs += ckpt['epoch']  # finetune additional epochs
 
     del ckpt, state_dict
-
 
 
 
