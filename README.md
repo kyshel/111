@@ -6,13 +6,14 @@ Developed in vscode with interactive features
 
 
 # p1
-- add wandb resume
+- none 
 
 # p9
-- unify data
+- unify dataset
 
 
 # logs
+- v10 wandb resume ok
 - v9 wandb ok
 - v8 resume ok
 - v7 add checkpoint 

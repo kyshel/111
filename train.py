@@ -325,26 +325,33 @@ opt.strip = False
 opt.nosave = False
 opt.notest = False
 opt.evolve = False
-opt.project = 'runs_emoji_train'
+opt.project = '28emoji'
 opt.batch = 64
 opt.split = 0.8
 opt.workers = 2
 opt.epochs = 10
 opt.save_dir = str(increment_path(Path(opt.project) / opt.name))
-# opt.weights = 'runs_train/exp76/weights/best.pt'
-# opt.resume = 'runs_train/exp76/weights/last.pt'
-
+opt.weights = '28emoji/exp21/weights/best.pt'
+# opt.resume = '28emoji/exp20/weights/last.pt'
 
 
 # Resume opt
 if opt.resume:
-    ckpt = opt.resume if isinstance(opt.resume, str) else None
+    ckpt = opt.resume if isinstance(opt.resume, str) else None  # ckpt is str(temp.pt)
     # print('ckpt:',ckpt)
     assert os.path.isfile(ckpt), 'ERROR: --resume checkpoint does not exist'
     with open(Path(ckpt).parent.parent / 'opt.yaml') as f:
         opt = argparse.Namespace(**yaml.safe_load(f))  # replace
         opt.weights = ckpt
-    logger.info('Resuming training from %s' % ckpt)
+        opt.resume = True
+        temp_dict = torch.load(opt.weights)
+        resume_wandb_id =  temp_dict['wandb_id']
+        del temp_dict
+    if not resume_wandb_id:
+        raise Exception("No need to resume.")
+
+
+
 
 # log
 logger.info('\n[+]log')
@@ -353,14 +360,18 @@ logger.info('\n[+]log')
 # logger.info(f"{prefix}Start with 'tensorboard --logdir {opt.project}', view at http://localhost:6006/")
 # tb_writer = SummaryWriter(opt.save_dir)  # Tensorboard
 
-# %%
-
 
 # wandb
+
+# if 'wandb' in vars() or 'wandb' in globals():  wandb.finish() # for notebook only
+
+logger.info("Check is wandb installed ...")
 name_inc = os.path.normpath(opt.save_dir).split(os.path.sep)[-1]
 wandb = util.wandb
 if wandb:
     logger.info("Wandb login ...")
+      
+
     is_wandb_login = wandb.login()
     # init wandb
     wandb.init(
@@ -370,8 +381,14 @@ if wandb:
         project=opt.project, 
         # Track hyperparameters and run metadata
         config=dict(opt.__dict__),
+        id = resume_wandb_id if opt.resume else wandb.util.generate_id(),
         name=name_inc,
+        resume="allow",
     )
+
+ 
+
+    
 
 else:
     logger.info('Wandb not installed, manual install: pip install wandb')
@@ -417,9 +434,13 @@ if device.type == 'cuda':
         round(torch.cuda.memory_allocated(0)/1024**3,1),
         round(torch.cuda.memory_reserved(0)/1024**3,1),
     ) 
-
 logger.info(msg)
 
+# clean tqdm 
+try:
+    tqdm._instances.clear()
+except Exception:
+    pass
 
 
 # Prepare datasets
@@ -475,6 +496,8 @@ else:
     model = Net()
     model.to(device)
 
+
+
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 logger.info('Model loaded.')
@@ -515,11 +538,7 @@ if pretrained:
 logger.info('\n[+]train')
 logger.info('Logging results to ' + str(save_dir))
 logger.info('Starting training for {} epochs...'.format(epochs))
-# clean tqdm 
-try:
-    tqdm._instances.clear()
-except Exception:
-    pass
+
 since = time.time()
 best_model_wts = copy.deepcopy(model.state_dict())
 # scheduler
@@ -587,13 +606,14 @@ for epoch in range(start_epoch,epochs):
         this_best = True
     
     # Log
-    wandb.log({
-        "train_loss":epoch_loss,
-        "val_loss":val_loss,
-        "train_acc":epoch_acc,
-        "val_acc":val_acc,
-        "lr":optimizer.param_groups[0]['lr'],
-    })
+    if wandb:
+        wandb.log({
+            "train_loss":epoch_loss,
+            "val_loss":val_loss,
+            "train_acc":epoch_acc,
+            "val_acc":val_acc,
+            "lr":optimizer.param_groups[0]['lr'],
+        })
         
     # Save
     if (not opt.nosave) or (final_epoch and not opt.evolve):
@@ -603,6 +623,7 @@ for epoch in range(start_epoch,epochs):
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': epoch_loss,
             'best_acc': best_acc,
+            'wandb_id': wandb.run.id if wandb else None,
         }
         torch.save(ckpt, last)
         if this_best:
@@ -617,20 +638,15 @@ print('{} epochs completed in {:.0f}m {:.0f}s \n'.format(
 print('Best val Acc: {:4f}'.format(best_acc))
 
 
-# Save weights
+# Strip optimizers
 final = best if best.exists() else last  # final model
-if not strip:
-    for f in last, best:
-        if f.exists():
-            mb = os.path.getsize(f) / 1E6  # filesize
-            print(f"Weights saved as {f},{mb:.1f}MB")
-else:
-    for f in last, best:
-        if f.exists():
-            strip_optimizer(f)  # strip optimizers
+for f in last, best:
+    if f.exists():
+        strip_optimizer(f)  # strip optimizers
 
-
-wandb.finish()
+if wandb:
+    wandb.summary['best_val_acc'] = best_acc
+    wandb.finish()
 # torch.cuda.empty_cache()
 
 # %% test
@@ -647,7 +663,7 @@ logger.info('End!')
  
 #%% exp
 
-util.rm1()
+
 
 # infer(validloader,model,classes,3)
 
@@ -668,5 +684,7 @@ if __name__ == '__main__':
                         default='blank', help='initial weights path')
     opt = parser.parse_args(args=[])
 
-    print(json.dumps(opt.__dict__, sort_keys=True))
+    print('main end')
+
+
 
