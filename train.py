@@ -1,7 +1,7 @@
 # %% preset
 
- 
-from torch.utils.tensorboard import SummaryWriter
+
+from collections import Counter
 import yaml
 import os
 import pandas as pd
@@ -36,6 +36,7 @@ import logging
 reload(util)
 from util import increment_path,strip_optimizer,colorstr
 from pathlib import Path
+from torch.utils.tensorboard import SummaryWriter
 
 logging.basicConfig(
         format="%(message)s",
@@ -46,6 +47,45 @@ logger = logging.getLogger(__name__)
 # %% functions
 
 
+
+
+def plot_cls_bar(cls_list, save_dir, dataset = None):
+    # plot bar of classes
+    data =  Counter(cls_list)
+    cls_id_list = list(data.keys())
+    num_list = list(data.values())
+    x = cls_id_list
+    y = num_list
+    if dataset:
+        if hasattr(dataset, 'cls_names'):
+            x = [str(id) + '' + dataset.cls_names[id]  for id in cls_id_list]
+ 
+    # https://stackoverflow.com/questions/19576317/matplotlib-savefig-does-not-save-axes/67369132#67369132
+    fig = plt.figure(facecolor=(1, 1, 1) )
+    # creating the bar plot
+    plt.bar(x, y, color ='maroon',
+            width = 0.4)
+    plt.xlabel("Classes")
+    plt.ylabel("No. of class")
+    plt.title("Class distribute")
+    
+    save_fp = os.path.join(str(save_dir), "classes_distribute.png")
+    plt.savefig(save_fp, bbox_inches='tight')
+    plt.close(fig)
+    # plt.show()
+
+
+
+def isinteractive():  # unreliable!
+    # Warning! this may determine wrong
+    try:
+        shell = get_ipython().__class__.__name__
+        if shell in ['ZMQInteractiveShell','TerminalInteractiveShell','Shell']:
+            return True   # Jupyter notebook or qtconsole or colab 
+        else:
+            return True  # Other type (?)
+    except NameError:
+        return False      # Probably standard Python interpreter
 
 def stop(msg='Stop here!'):
     raise Exception(msg)
@@ -121,10 +161,10 @@ def test(loader,
         logger.info('Done! Check csv: '+ unified_fp )
 
         # for _emoji only
+        df = pd.read_csv('../02read/sample_submit.csv')
         csv_fp = str(save_dir/'emoji_submit.csv')
         map_fn2cid = dict(zip(fn_list, pred_list))
         # print(map_fn2cid)
-        df = pd.read_csv('/content/02read/sample_submit.csv')
         logger.info('Updaing _emoji df: '+ csv_fp )
         for i in tqdm(df.index):
             # print(i)
@@ -183,7 +223,7 @@ def imshow(img):
 
 # %% dataset   
 class Emoji(VisionDataset):
-    pkl_fp = '/content/_emoji/03save.pkl'
+    pkl_fp = '../03save.pkl'
     classes = ('angry', 'disgusted', 'fearful',
             'happy', 'neutral', 'sad', 'surprised')
     cls_names = classes
@@ -225,7 +265,7 @@ class Emoji(VisionDataset):
 
         img_np_list = np.asarray(img_list)  # convert to np
         img_np_list2 = np.repeat(
-            img_np_list[:, :, :, np.newaxis], 3, axis=3)  # expand 1 axis
+            img_np_list[:, :, :, np.newaxis], 3, axis=3)  # expand 1 channel to 3 channel 
 
         # print( img_np_list.shape)
         # print( 'img_np_list2 shape',img_np_list2.shape)
@@ -268,6 +308,27 @@ class Emoji(VisionDataset):
 
 
 # %% model  
+class Net1(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Conv2d(3, 6, 5)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(6, 16, 5)
+        # self.fc1 = nn.Linear(16 * 5 * 5, 120)
+        self.fc1 = nn.Linear(1296, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, 7)
+    def forward(self, x):
+        x = self.pool(F.relu(self.conv1(x)))      
+        x = self.pool(F.relu(self.conv2(x)))      
+        x = torch.flatten(x, 1) # flatten all dimensions except batch        
+        x = F.relu(self.fc1(x))        
+        x = F.relu(self.fc2(x)) 
+        x = self.fc3(x)      
+        return x
+
+
+
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
@@ -280,26 +341,14 @@ class Net(nn.Module):
         self.fc3 = nn.Linear(84, 7)
 
     def forward(self, x):
-        show_list = []
- 
-        show_list += [x.shape]
-        # print(show_list)
-        x = self.pool(F.relu(self.conv1(x)))
-        
-        show_list += [x.shape]
-        x = self.pool(F.relu(self.conv2(x)))
-        show_list += [x.shape]
-        x = torch.flatten(x, 1) # flatten all dimensions except batch
-        show_list += [x.shape]
-        x = F.relu(self.fc1(x))
-        show_list += [x.shape]
-        x = F.relu(self.fc2(x))
-        show_list += [x.shape]
+        x = self.pool(F.relu(self.conv1(x)))      
+        x = self.pool(F.relu(self.conv2(x)))      
+        x = torch.flatten(x, 1) # flatten all dimensions except batch        
+        x = F.relu(self.fc1(x))        
+        x = F.relu(self.fc2(x)) 
         x = self.fc3(x)
-        show_list += [x.shape]
-        for i,v in enumerate(show_list):
-          # print(i,v)
-          pass
+         
+ 
          
         return x
 
@@ -313,27 +362,47 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--weights', type=str, default='', help='initial weights path')
 parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
 parser.add_argument('--notest', action='store_true', help='only test final epoch')
+parser.add_argument('--nowandb', action='store_true', help='disable wandb')
 parser.add_argument('--strip', action='store_true', help='only test final epoch')
 parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
 parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')
+parser.add_argument('--proxy', nargs='?', const=True, default=False, help='proxy')
 parser.add_argument('--name', default='exp', help='save to project/name')
-opt = parser.parse_args(args=[])
+if isinteractive(): # not reliable, temp debug only  
+    opt = parser.parse_args(args=[]) 
+else:
+    opt = parser.parse_args()
+
 
 # default opt
 
+opt.nowandb = True
 opt.strip = False
 opt.nosave = False
 opt.notest = False
 opt.evolve = False
+opt.proxy = True
 opt.project = '28emoji'
 opt.batch = 64
 opt.split = 0.8
 opt.workers = 2
-opt.epochs = 10
+opt.epochs = 3
 opt.save_dir = str(increment_path(Path(opt.project) / opt.name))
-opt.weights = '28emoji/exp21/weights/best.pt'
+# opt.weights = '28emoji/exp21/weights/best.pt'
 # opt.resume = '28emoji/exp20/weights/last.pt'
 
+
+# proxy
+if opt.proxy:
+    if opt.proxy == True:
+        proxy_url = "http://127.0.0.1:1080" 
+    else:
+        proxy_url = opt.proxy
+    logger.info("\n[+]proxy \nProxy has been set to "+ proxy_url)
+    os.environ['http_proxy'] = proxy_url
+    os.environ['https_proxy'] = proxy_url
+
+ 
 
 # Resume opt
 if opt.resume:
@@ -353,45 +422,6 @@ if opt.resume:
 
 
 
-# log
-logger.info('\n[+]log')
-# Tensorboard
-# prefix = colorstr('tensorboard: ')
-# logger.info(f"{prefix}Start with 'tensorboard --logdir {opt.project}', view at http://localhost:6006/")
-# tb_writer = SummaryWriter(opt.save_dir)  # Tensorboard
-
-
-# wandb
-
-# if 'wandb' in vars() or 'wandb' in globals():  wandb.finish() # for notebook only
-
-logger.info("Check is wandb installed ...")
-name_inc = os.path.normpath(opt.save_dir).split(os.path.sep)[-1]
-wandb = util.wandb
-if wandb:
-    logger.info("Wandb login ...")
-      
-
-    is_wandb_login = wandb.login()
-    # init wandb
-    wandb.init(
-        # Set entity to specify your username or team name
-        # ex: entity="carey",
-        # Set the project where this run will be logged
-        project=opt.project, 
-        # Track hyperparameters and run metadata
-        config=dict(opt.__dict__),
-        id = resume_wandb_id if opt.resume else wandb.util.generate_id(),
-        name=name_inc,
-        resume="allow",
-    )
-
- 
-
-    
-
-else:
-    logger.info('Wandb not installed, manual install: pip install wandb')
 
 
  
@@ -473,7 +503,7 @@ logger.info("split_dot:{}, train/test={}/{} \nclasses_count: {}, batch_size:{}".
 
 labels = raw_train.targets
 c = torch.tensor(labels[:])  # classes
-# tb_writer.add_histogram('classes', c, 0)
+# writer.add_histogram('classes', c, 0)
 
 
 logger.info("Dataset loaded.")
@@ -497,6 +527,23 @@ else:
     model.to(device)
 
 
+# %%  model, rm
+# model =  nn.Sequential(
+#           nn.Linear(84, 7),
+#           nn.ReLU(),
+#           nn.Linear(84, 7),
+#           nn.Softmax()
+#         )
+# print(model)
+
+
+
+
+
+
+ 
+
+# %% continue
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
@@ -528,10 +575,53 @@ if pretrained:
     del ckpt, state_dict
 
 
+# log init
+logger.info('\n[+]log')
+# Tensorboard
+prefix = colorstr('tensorboard: ')
+logger.info(f"{prefix}Start with 'tensorboard --logdir {opt.project}', view at http://localhost:6006/")
+writer = SummaryWriter(opt.save_dir)  # Tensorboard
+# wandb
+# if 'wandb' in vars() or 'wandb' in globals():  wandb.finish() # for notebook only
+if not opt.nowandb:
+    logger.info("Check is wandb installed ...")
+    name_inc = os.path.normpath(opt.save_dir).split(os.path.sep)[-1]
+    wandb = util.wandb
+    if wandb:
+        logger.info("Wandb login ...")
+        is_wandb_login = wandb.login()
+        # init wandb
+        wandb.init(
+            # Set entity to specify your username or team name
+            # ex: entity="carey",
+            # Set the project where this run will be logged
+            project=opt.project, 
+            # Track hyperparameters and run metadata
+            config=dict(opt.__dict__),
+            id = resume_wandb_id if opt.resume else wandb.util.generate_id(),
+            name=name_inc,
+            resume="allow",
+        )
+    else:
+        logger.info('Wandb not installed, manual install: pip install wandb')
+else:
+    wandb = None
 
+# log images
+images, labels, _ = next(iter(trainloader))
+images, labels = images.to(device), labels.to(device)
+images = (images / 2 + 0.5) 
+grid = torchvision.utils.make_grid(images)
+writer.add_image('train_images', grid, 0)
+writer.add_graph(model, images)
+# save plot
+plot_cls_bar(raw_train.targets, save_dir, raw_train)
+# writer.add_image('cls_distri_img', cls_distri_img, 0)
+# writer.add_histogram('raw_train_classes', torch.tensor(raw_train.targets), 1)
+# writer.add_histogram('raw_test_classes', torch.tensor(raw_test.targets), 1)
 
-
-
+# log summary
+writer.add_text('opt', str(opt.__dict__), 0)
 
 
 # Start Training
@@ -558,7 +648,7 @@ for epoch in range(start_epoch,epochs):
     pbar = tqdm(trainloader,
         # file=sys.stdout,
         leave=True,
-        bar_format='{l_bar}{bar:3}{r_bar}{bar:-10b}',
+        bar_format='{l_bar}{bar:5}{r_bar}{bar:-10b}',
         total=len(trainloader), mininterval=1,
     )
     for i,(inputs, labels, _) in  enumerate(pbar,0):
@@ -585,7 +675,7 @@ for epoch in range(start_epoch,epochs):
             '%g/%g' % (epoch, epochs - 1), mem ,mloss,macc    )
         pbar.set_description(s, refresh=False)
         imgs = inputs
-        # tb_writer.add_graph(torch.jit.trace(model, imgs, strict=False), [])  # add model graph
+        # writer.add_graph(torch.jit.trace(model, imgs, strict=False), [])  # add model graph
         # end batch  -----------------
     epoch_loss = running_loss / len(trainloader.dataset)
     epoch_acc = running_corrects.double() / len(trainloader.dataset)
@@ -606,6 +696,10 @@ for epoch in range(start_epoch,epochs):
         this_best = True
     
     # Log
+    writer.add_scalar('Loss/train', epoch_loss, epoch)
+    writer.add_scalar('Loss/val', val_loss, epoch)
+    writer.add_scalar('Acc/train', epoch_acc, epoch)
+    writer.add_scalar('Acc/val', val_acc, epoch)
     if wandb:
         wandb.log({
             "train_loss":epoch_loss,
@@ -644,6 +738,9 @@ for f in last, best:
     if f.exists():
         strip_optimizer(f)  # strip optimizers
 
+
+# log end
+writer.close()
 if wandb:
     wandb.summary['best_val_acc'] = best_acc
     wandb.finish()
@@ -651,8 +748,8 @@ if wandb:
 
 # %% test
 logger.info('\n[+]test')
+logger.info('loading best model ')
 model.load_state_dict(best_model_wts)
-
 # will error as sliced
 test(testloader,model,testset=raw_test,is_savecsv=1,opt=opt,save_dir = save_dir) 
 
@@ -678,13 +775,14 @@ logger.info('End!')
  
 
 # %% set opt
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--placeholder', type=str,
-                        default='blank', help='initial weights path')
-    opt = parser.parse_args(args=[])
-
-    print('main end')
-
+# if __name__ == '__main__':
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument('--placeholder', type=str,
+#                         default='blank', help='initial weights path')
+#     opt = parser.parse_args()
+#     print('main end')
 
 
+
+ 
+ 
