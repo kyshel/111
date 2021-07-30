@@ -10,9 +10,14 @@ Developed in vscode with interactive features
 
 # p9
 - unify dataset
+- repro not work in notebook
+- isinteractive not reliable
 
 
 # logs
+- v13 logger to local file ok 
+- v12 reproducibility ok
+- v11 tensorboard ok
 - v10 wandb resume ok
 - v9 wandb ok
 - v8 resume ok

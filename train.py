@@ -1,6 +1,6 @@
 # %% preset
-
-
+import random  
+from torchsummary import summary
 from collections import Counter
 import yaml
 import os
@@ -38,16 +38,13 @@ from util import increment_path,strip_optimizer,colorstr
 from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
 
-logging.basicConfig(
-        format="%(message)s",
-        level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
+ 
 # %% functions
 
-
-
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
 
 def plot_cls_bar(cls_list, save_dir, dataset = None):
     # plot bar of classes
@@ -360,10 +357,10 @@ class Net(nn.Module):
 # begin
 parser = argparse.ArgumentParser()
 parser.add_argument('--weights', type=str, default='', help='initial weights path')
+parser.add_argument('--repro', action='store_true', help='only save final checkpoint')
 parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
 parser.add_argument('--notest', action='store_true', help='only test final epoch')
 parser.add_argument('--nowandb', action='store_true', help='disable wandb')
-parser.add_argument('--strip', action='store_true', help='only test final epoch')
 parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
 parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--proxy', nargs='?', const=True, default=False, help='proxy')
@@ -376,20 +373,20 @@ else:
 
 # default opt
 
-opt.nowandb = True
-opt.strip = False
-opt.nosave = False
-opt.notest = False
-opt.evolve = False
-opt.proxy = True
-opt.project = '28emoji'
-opt.batch = 64
+opt.epochs = 5   
+opt.batch = 32
+
 opt.split = 0.8
-opt.workers = 2
-opt.epochs = 3
+opt.workers = 8 
+ 
+opt.repro = True if not isinteractive() else False
+# opt.nowandb = True
+opt.project = '28emoji'
 opt.save_dir = str(increment_path(Path(opt.project) / opt.name))
 # opt.weights = '28emoji/exp21/weights/best.pt'
-# opt.resume = '28emoji/exp20/weights/last.pt'
+opt.resume = '28emoji/exp38/weights/last.pt'
+
+
 
 
 # proxy
@@ -398,7 +395,7 @@ if opt.proxy:
         proxy_url = "http://127.0.0.1:1080" 
     else:
         proxy_url = opt.proxy
-    logger.info("\n[+]proxy \nProxy has been set to "+ proxy_url)
+    print("\n[+]proxy \nProxy has been set to "+ proxy_url)
     os.environ['http_proxy'] = proxy_url
     os.environ['https_proxy'] = proxy_url
 
@@ -412,6 +409,7 @@ if opt.resume:
     with open(Path(ckpt).parent.parent / 'opt.yaml') as f:
         opt = argparse.Namespace(**yaml.safe_load(f))  # replace
         opt.weights = ckpt
+        print('Resuming training from %s' % ckpt)
         opt.resume = True
         temp_dict = torch.load(opt.weights)
         resume_wandb_id =  temp_dict['wandb_id']
@@ -426,13 +424,12 @@ if opt.resume:
 
  
 # load opt
-logger.info('\n[+]opt\n' + json.dumps(opt.__dict__, sort_keys=True) )
+
 weights = opt.weights
 split_dot = opt.split  
 workers = opt.workers
 batch_size = opt.batch
 epochs = opt.epochs
-strip = opt.strip
 save_dir = Path(opt.save_dir)
 wdir = save_dir / 'weights'
 
@@ -450,9 +447,18 @@ with open(save_dir / 'opt.yaml', 'w') as f:
     yaml.safe_dump(vars(opt), f, sort_keys=False)
 
 
+# logger AFTER MKDIR
+logging.basicConfig(
+        format="%(message)s",
+        level=logging.INFO,
+        handlers=[
+            logging.FileHandler(save_dir / 'logger.txt'),
+            logging.StreamHandler()
+        ]
+    )
+logger = logging.getLogger(__name__)
+logger.info('\n[+]opt\n' + json.dumps(opt.__dict__, sort_keys=True) )
  
-
-
 # GPU info
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 msg = "\n[+]device \nICH 🚀 v0.1 Using device: {}".format(device) 
@@ -473,6 +479,19 @@ except Exception:
     pass
 
 
+# Reproducibility   NOT work in notebook!
+seed = random.randint(0,9999)
+if opt.repro:
+    seed = 0
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    torch.use_deterministic_algorithms(True)
+    torch.backends.cudnn.deterministic = True
+else: torch.use_deterministic_algorithms(False) # empty notenook cache
+g = torch.Generator()
+g.manual_seed(seed)
+ 
 # Prepare datasets
 logger.info('\n[+]load dataset')
 transform = transforms.Compose(
@@ -486,20 +505,24 @@ classes = raw_train.classes
 num_train = int(len(raw_train) * split_dot)
 trainset, validset = \
     random_split(raw_train, [num_train, len(raw_train) - num_train],
-                    generator=torch.Generator().manual_seed(42))
+                    generator=g)
 
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
-                                            shuffle=True, num_workers=workers)
+                                            shuffle=True, num_workers=workers,
+                                            worker_init_fn=seed_worker,
+                                            generator=g,)
 validloader = torch.utils.data.DataLoader(validset, batch_size=batch_size,
-                                        shuffle=False, num_workers=workers)
+                                        shuffle=False, num_workers=workers,
+                                        worker_init_fn=seed_worker,
+                                        generator=g)
 testloader = torch.utils.data.DataLoader(raw_test, batch_size=batch_size,
-                                        shuffle=False, num_workers=workers)
+                                        shuffle=False, num_workers=workers,
+                                        worker_init_fn=seed_worker,
+                                        generator=g)
 
 dataset_sizes ={'train':len(trainset),"val":len(validset),"test":len(raw_test)}
 # info['dataset_size'] = dataset_sizes
-logger.info("split_dot:{}, train/test={}/{} \nclasses_count: {}, batch_size:{}".format(
-    split_dot,len(raw_train),len(raw_test),len(classes),batch_size
-))
+
 
 labels = raw_train.targets
 c = torch.tensor(labels[:])  # classes
@@ -527,23 +550,83 @@ else:
     model.to(device)
 
 
-# %%  model, rm
-# model =  nn.Sequential(
-#           nn.Linear(84, 7),
-#           nn.ReLU(),
-#           nn.Linear(84, 7),
-#           nn.Softmax()
-#         )
-# print(model)
+ 
+model0 =  nn.Sequential(
+            nn.Conv2d(3,6,5),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),
+
+            nn.Conv2d(6,16,5),
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2),
 
 
+            nn.Flatten(),
+
+            nn.Linear(1296, 120),
+            nn.ReLU(),
+
+            nn.Linear(120, 84),
+            nn.ReLU(),
+
+            nn.Linear(84, 7),
+)
+
+# model1 =  nn.Sequential(
+            
+#             nn.Flatten(),
+        
+#             nn.Linear(3*48*48, 256),
+#             nn.ReLU(),
+
+#             # nn.Linear(1024, 128),
+#             # nn.ReLU(),
+
+#             nn.Linear(256, 7),  
+#             # nn.Softmax()
+             
+# )
+
+# %% model redeine
+model =  nn.Sequential( # > 3 48 48
+            nn.Conv2d(3,6,5), # > 6 44 44
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2), # 6 22 22
+
+            nn.Conv2d(6,16,5), # 16 18 18
+            nn.ReLU(), 
+            nn.MaxPool2d(2, 2), # 16 9 9
+
+
+            nn.Flatten(), # 16*9*9 
+
+            nn.Linear(16*9*9, 64), 
+            nn.ReLU(),
+
+            # nn.Linear(120, 64),
+            # nn.ReLU(),
+
+            nn.Linear(64, 7),
+)
+
+
+
+model.to(device)
+
+# preview shape route
+input_shape = next(iter(trainloader))[0][0].shape
+print("Input shape:",input_shape)
+summary(model, input_shape)
+
+ 
+# %% continue
 
 
 
 
  
 
-# %% continue
+
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
@@ -575,8 +658,8 @@ if pretrained:
     del ckpt, state_dict
 
 
-# log init
-logger.info('\n[+]log')
+# visual
+logger.info('\n[+]visual')
 # Tensorboard
 prefix = colorstr('tensorboard: ')
 logger.info(f"{prefix}Start with 'tensorboard --logdir {opt.project}', view at http://localhost:6006/")
@@ -601,6 +684,7 @@ if not opt.nowandb:
             id = resume_wandb_id if opt.resume else wandb.util.generate_id(),
             name=name_inc,
             resume="allow",
+            tags = ["explorer"],
         )
     else:
         logger.info('Wandb not installed, manual install: pip install wandb')
@@ -622,7 +706,11 @@ plot_cls_bar(raw_train.targets, save_dir, raw_train)
 
 # log summary
 writer.add_text('opt', str(opt.__dict__), 0)
-
+logger.info("\n[+]info")
+logger.info(model)
+logger.info("datasets: split_dot:{}, train/test={}/{} \nclasses_count: {}, batch_size:{}".format(
+    split_dot,len(raw_train),len(raw_test),len(classes),batch_size
+))
 
 # Start Training
 logger.info('\n[+]train')
@@ -632,7 +720,7 @@ logger.info('Starting training for {} epochs...'.format(epochs))
 since = time.time()
 best_model_wts = copy.deepcopy(model.state_dict())
 # scheduler
-scheduler = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+scheduler = lr_scheduler.StepLR(optimizer, step_size=300, gamma=2)
 scheduler.last_epoch = start_epoch - 1  # do not move
 for epoch in range(start_epoch,epochs):
     logging.info("")
@@ -648,7 +736,7 @@ for epoch in range(start_epoch,epochs):
     pbar = tqdm(trainloader,
         # file=sys.stdout,
         leave=True,
-        bar_format='{l_bar}{bar:5}{r_bar}{bar:-10b}',
+        bar_format='{l_bar}{bar:3}{r_bar}{bar:-10b}',
         total=len(trainloader), mininterval=1,
     )
     for i,(inputs, labels, _) in  enumerate(pbar,0):
@@ -700,6 +788,7 @@ for epoch in range(start_epoch,epochs):
     writer.add_scalar('Loss/val', val_loss, epoch)
     writer.add_scalar('Acc/train', epoch_acc, epoch)
     writer.add_scalar('Acc/val', val_acc, epoch)
+    writer.add_scalar('lr', optimizer.param_groups[0]['lr'], epoch)
     if wandb:
         wandb.log({
             "train_loss":epoch_loss,
@@ -727,9 +816,9 @@ for epoch in range(start_epoch,epochs):
 
 
 time_elapsed = time.time() - since
-print('{} epochs completed in {:.0f}m {:.0f}s \n'.format(
+logger.info('{} epochs completed in {:.0f}m {:.0f}s \n'.format(
     epochs - start_epoch , time_elapsed // 60, time_elapsed % 60)) # epoch should + 1?
-print('Best val Acc: {:4f}'.format(best_acc))
+logger.info('Best val Acc: {:4f}'.format(best_acc))
 
 
 # Strip optimizers
@@ -744,7 +833,7 @@ writer.close()
 if wandb:
     wandb.summary['best_val_acc'] = best_acc
     wandb.finish()
-# torch.cuda.empty_cache()
+torch.cuda.empty_cache()
 
 # %% test
 logger.info('\n[+]test')
