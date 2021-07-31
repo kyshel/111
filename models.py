@@ -116,9 +116,17 @@ model_basic =  nn.Sequential( # > 3 48 48
 
 
 
-model_ft  = torchvision.models.resnet18(pretrained=True)
-model_ft.fc = nn.Linear(model_ft.fc.in_features, 7)
-model_res18 = model_ft
+
+
+res18 = torchvision.models.resnet18()
+res18.fc = nn.Linear(res18.fc.in_features, 7)
+
+
+res18_pre  = torchvision.models.resnet18(pretrained=True)
+res18_pre.fc = nn.Linear(res18_pre.fc.in_features, 7)
+
+
+
 
 
 

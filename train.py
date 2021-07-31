@@ -319,30 +319,6 @@ class Emoji(VisionDataset):
 
 
 
-# %% model  
-class Net1(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        # self.fc1 = nn.Linear(16 * 5 * 5, 120)
-        self.fc1 = nn.Linear(1296, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 7)
-    def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))      
-        x = self.pool(F.relu(self.conv2(x)))      
-        x = torch.flatten(x, 1) # flatten all dimensions except batch        
-        x = F.relu(self.fc1(x))        
-        x = F.relu(self.fc2(x)) 
-        x = self.fc3(x)      
-        return x
-
-
-
-
-
 
 # %% main
 
@@ -395,8 +371,8 @@ else:
 
 
 # overide opt 
-opt.model = 'model_res18'
-opt.epochs = 30   
+opt.model = 'res18_pre'
+opt.epochs = 60   
 opt.batch = 32
 
 opt.split = 0.8
@@ -509,13 +485,23 @@ except Exception:
 
 # dataset
 logger.info('\n[+]dataset')
-transform = transforms.Compose(
+# transform = transforms.Compose(
+#     [transforms.ToTensor(),
+#         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+transform_train = transforms.Compose(
     [transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+        transforms.Normalize([0.5077, 0.5077, 0.5077],[0.2186, 0.2186, 0.2186])])
+
+transform_test = transforms.Compose(
+    [transforms.ToTensor(),
+        transforms.Normalize([0.5060, 0.5060, 0.5060],[0.2191, 0.2191, 0.2191])])
+
+
+
 raw_train = Emoji(root='./data', train=True,
-                    transform=transform)
+                    transform=transform_train)
 raw_test = Emoji(root='./data', train=False,
-                    transform=transform)
+                    transform=transform_test)
 classes = raw_train.classes
 num_train = int(len(raw_train) * split_dot)
 trainset, validset = \
@@ -549,7 +535,6 @@ if pretrained:
     model.load_state_dict(state_dict, strict=False)  # load
     logger.info('Transferred %g/%g items from %s' % (len(state_dict), len(model.state_dict()), weights))  # report
 else:
-    logger.info('Build Model from scratch.')
     model_name = opt.model
     model = getattr(models, model_name)
 model.to(device)
@@ -748,6 +733,8 @@ time_elapsed = time.time() - since
 logger.info('{} epochs completed in {:.0f}m {:.0f}s \n'.format(
     epochs - start_epoch , time_elapsed // 60, time_elapsed % 60)) # epoch should + 1?
 logger.info('Best val Acc: {:4f}'.format(best_acc))
+writer.add_text('summary/best_acc', str(best_acc), 0)
+
 
 
 # Strip optimizers
