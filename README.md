@@ -15,6 +15,7 @@ Developed in vscode with interactive features
 
 
 # logs
+- v14 add model selection
 - v13 logger to local file ok 
 - v12 reproducibility ok
 - v11 tensorboard ok

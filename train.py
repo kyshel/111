@@ -1,4 +1,6 @@
 # %% preset
+
+
 import random  
 from torchsummary import summary
 from collections import Counter
@@ -28,17 +30,30 @@ from torch.optim import lr_scheduler
 import util
 import ax
 from importlib import reload
-reload(util)
-reload(ax)
+# reload(util)
+# reload(ax)
+# reload(models) # affect repro maybe 
 import  itertools 
 import sys
 import logging
-reload(util)
 from util import increment_path,strip_optimizer,colorstr
 from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
 
- 
+# logger 
+logging.basicConfig(
+        format="%(message)s",
+        level=logging.INFO,
+        handlers=[
+            # logging.FileHandler(save_dir / 'logger.txt'), # should get dir after 
+            logging.StreamHandler()
+        ]
+    )
+logger = logging.getLogger(__name__)
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 # %% functions
 
 def seed_worker(worker_id):
@@ -131,20 +146,20 @@ def test(loader,
             
             if is_training:
                 loss = criterion(outputs, labels)
-                running_loss += loss.item() * inputs.size(0)
+                running_loss += loss.item() * images.size(0) # losst.item * batch_size
                 running_corrects += torch.sum(preds == labels.data)
                 cols_str = ('%10s' * len(cols)) % (cols)
                 pbar.set_description(cols_str, refresh=False)
        
         
-        if is_training:
-            epoch_loss = running_loss / len(loader.dataset)
-            epoch_acc = running_corrects.double() / len(loader.dataset)
-            s = ('%30.4g' + '%10.4g' * 1) % (epoch_loss,epoch_acc)
-            # s = ('%10.4g' + '%10.4g' * 1) % (epoch_loss,epoch_acc)
-            logging.info(s)
-            val_acc = epoch_acc
-            val_loss = epoch_loss
+    if is_training:
+        epoch_loss = running_loss / len(loader.dataset)
+        epoch_acc = running_corrects.double() / len(loader.dataset)
+        s = ('%30.4g' + '%10.4g' * 1) % (epoch_loss,epoch_acc)
+        # s = ('%10.4g' + '%10.4g' * 1) % (epoch_loss,epoch_acc)
+        logger.info(s)
+        val_acc = epoch_acc
+        val_loss = epoch_loss
 
   
     # savecsv
@@ -167,7 +182,7 @@ def test(loader,
             # print(i)
             fn = df.iloc[i]['name']
             cls_id =map_fn2cid[fn]
-            df.at[i, 'label'] = classes[cls_id]
+            df.at[i, 'label'] = loader.dataset.classes[cls_id]
         df.to_csv(csv_fp, encoding='utf-8', index=False)
         logger.info('done! check: '+ csv_fp )
 
@@ -326,37 +341,44 @@ class Net1(nn.Module):
 
 
 
-class Net(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        # self.fc1 = nn.Linear(16 * 5 * 5, 120)
-        self.fc1 = nn.Linear(1296, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 7)
 
-    def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))      
-        x = self.pool(F.relu(self.conv2(x)))      
-        x = torch.flatten(x, 1) # flatten all dimensions except batch        
-        x = F.relu(self.fc1(x))        
-        x = F.relu(self.fc2(x)) 
-        x = self.fc3(x)
-         
- 
-         
-        return x
 
 
 # %% main
 
 
+# %% test
+    # logger.info('\n[+]test')
+    # logger.info('loading best model ')
+    # model.load_state_dict(best_model_wts)
+    # # will error as sliced
+    # test(testloader,model,testset=raw_test,is_savecsv=1,opt=opt,save_dir = save_dir) 
 
-# begin
+    # logger.info('End!')
+
+ 
+
+ 
+#%% exp
+
+
+
+# infer(validloader,model,classes,3)
+
+
+
+
+
+
+
+
+
+ 
+
+# %% set opt
+# if __name__ == '__main__':
 parser = argparse.ArgumentParser()
-parser.add_argument('--weights', type=str, default='', help='initial weights path')
+parser.add_argument('--weights', type=str, default='', help='initial weights path, override model')
 parser.add_argument('--repro', action='store_true', help='only save final checkpoint')
 parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
 parser.add_argument('--notest', action='store_true', help='only test final epoch')
@@ -365,30 +387,31 @@ parser.add_argument('--evolve', action='store_true', help='evolve hyperparameter
 parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--proxy', nargs='?', const=True, default=False, help='proxy')
 parser.add_argument('--name', default='exp', help='save to project/name')
+parser.add_argument('--model', default='model_basic', help='set model when from scratch')
 if isinteractive(): # not reliable, temp debug only  
     opt = parser.parse_args(args=[]) 
 else:
     opt = parser.parse_args()
 
 
-# default opt
-
-opt.epochs = 5   
+# overide opt 
+opt.model = 'model_res18'
+opt.epochs = 30   
 opt.batch = 32
 
 opt.split = 0.8
 opt.workers = 8 
- 
+
 opt.repro = True if not isinteractive() else False
-# opt.nowandb = True
+opt.nowandb = True
 opt.project = '28emoji'
-opt.save_dir = str(increment_path(Path(opt.project) / opt.name))
 # opt.weights = '28emoji/exp21/weights/best.pt'
-opt.resume = '28emoji/exp38/weights/last.pt'
+# opt.resume = '28emoji/exp38/weights/last.pt'
 
 
 
-
+# opt extend 
+opt.save_dir = str(increment_path(Path(opt.project) / opt.name))
 # proxy
 if opt.proxy:
     if opt.proxy == True:
@@ -399,18 +422,38 @@ if opt.proxy:
     os.environ['http_proxy'] = proxy_url
     os.environ['https_proxy'] = proxy_url
 
- 
 
-# Resume opt
+# Reproducibility,  NOT work in notebook!
+seed = random.randint(0,9999)
+if opt.repro:
+    logger.info('!!! Using reproducibility !!!')
+    seed = 0
+    os.environ['ICH_REPRO'] = '1'
+    import models
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    torch.use_deterministic_algorithms(True)
+    torch.backends.cudnn.deterministic = True
+    g = torch.Generator()
+    g.manual_seed(seed)
+    
+else: 
+    os.environ['ICH_REPRO'] = '0'
+    import models
+    torch.use_deterministic_algorithms(False) # for notenook!
+    g = torch.Generator()
+    g.manual_seed(seed)
+
+
+# resume
 if opt.resume:
     ckpt = opt.resume if isinstance(opt.resume, str) else None  # ckpt is str(temp.pt)
-    # print('ckpt:',ckpt)
     assert os.path.isfile(ckpt), 'ERROR: --resume checkpoint does not exist'
     with open(Path(ckpt).parent.parent / 'opt.yaml') as f:
         opt = argparse.Namespace(**yaml.safe_load(f))  # replace
         opt.weights = ckpt
         print('Resuming training from %s' % ckpt)
-        opt.resume = True
         temp_dict = torch.load(opt.weights)
         resume_wandb_id =  temp_dict['wandb_id']
         del temp_dict
@@ -418,11 +461,6 @@ if opt.resume:
         raise Exception("No need to resume.")
 
 
-
-
-
-
- 
 # load opt
 
 weights = opt.weights
@@ -438,7 +476,8 @@ wdir.mkdir(parents=True, exist_ok=True)  # make dir
 last = wdir / 'last.pt'
 best = wdir / 'best.pt'
 results_file = save_dir / 'results.txt'
-
+logger.addHandler(logging.FileHandler(save_dir / 'logger.txt')) 
+logger.info('\n[+]opt\n' + json.dumps(opt.__dict__, sort_keys=True) )
 
 # Save run settings
 # with open(save_dir / 'hyp.yaml', 'w') as f:
@@ -447,20 +486,7 @@ with open(save_dir / 'opt.yaml', 'w') as f:
     yaml.safe_dump(vars(opt), f, sort_keys=False)
 
 
-# logger AFTER MKDIR
-logging.basicConfig(
-        format="%(message)s",
-        level=logging.INFO,
-        handlers=[
-            logging.FileHandler(save_dir / 'logger.txt'),
-            logging.StreamHandler()
-        ]
-    )
-logger = logging.getLogger(__name__)
-logger.info('\n[+]opt\n' + json.dumps(opt.__dict__, sort_keys=True) )
- 
-# GPU info
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# gpu  
 msg = "\n[+]device \nICH 🚀 v0.1 Using device: {}".format(device) 
 #Additional Info when using cuda
 if device.type == 'cuda':
@@ -472,28 +498,17 @@ if device.type == 'cuda':
     ) 
 logger.info(msg)
 
-# clean tqdm 
+# clean tqdm for notebook
 try:
     tqdm._instances.clear()
 except Exception:
     pass
 
 
-# Reproducibility   NOT work in notebook!
-seed = random.randint(0,9999)
-if opt.repro:
-    seed = 0
-    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    torch.use_deterministic_algorithms(True)
-    torch.backends.cudnn.deterministic = True
-else: torch.use_deterministic_algorithms(False) # empty notenook cache
-g = torch.Generator()
-g.manual_seed(seed)
- 
-# Prepare datasets
-logger.info('\n[+]load dataset')
+
+
+# dataset
+logger.info('\n[+]dataset')
 transform = transforms.Compose(
     [transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -519,122 +534,30 @@ testloader = torch.utils.data.DataLoader(raw_test, batch_size=batch_size,
                                         shuffle=False, num_workers=workers,
                                         worker_init_fn=seed_worker,
                                         generator=g)
-
-dataset_sizes ={'train':len(trainset),"val":len(validset),"test":len(raw_test)}
-# info['dataset_size'] = dataset_sizes
-
-
-labels = raw_train.targets
-c = torch.tensor(labels[:])  # classes
-# writer.add_histogram('classes', c, 0)
-
-
 logger.info("Dataset loaded.")
 
- 
 
+# model
+logger.info('\n[+]model')
 
-# Load model
-logger.info('\n[+]load model')
 pretrained = weights.endswith('.pt')
 if pretrained:
     ckpt = torch.load(weights, map_location=device)  # load checkpoint
-    model = Net()  # create
     state_dict = ckpt['model'].float().state_dict()  # to FP32
+    model_name = ckpt['model_name']
+    model = getattr(models, model_name)
     model.load_state_dict(state_dict, strict=False)  # load
-    model.to(device)
     logger.info('Transferred %g/%g items from %s' % (len(state_dict), len(model.state_dict()), weights))  # report
 else:
-    logger.info('Building Model from scratch...')
-    model = Net()
-    model.to(device)
-
-
- 
-model0 =  nn.Sequential(
-            nn.Conv2d(3,6,5),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-
-            nn.Conv2d(6,16,5),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-
-
-            nn.Flatten(),
-
-            nn.Linear(1296, 120),
-            nn.ReLU(),
-
-            nn.Linear(120, 84),
-            nn.ReLU(),
-
-            nn.Linear(84, 7),
-)
-
-# model1 =  nn.Sequential(
-            
-#             nn.Flatten(),
-        
-#             nn.Linear(3*48*48, 256),
-#             nn.ReLU(),
-
-#             # nn.Linear(1024, 128),
-#             # nn.ReLU(),
-
-#             nn.Linear(256, 7),  
-#             # nn.Softmax()
-             
-# )
-
-# %% model redeine
-model =  nn.Sequential( # > 3 48 48
-            nn.Conv2d(3,6,5), # > 6 44 44
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2), # 6 22 22
-
-            nn.Conv2d(6,16,5), # 16 18 18
-            nn.ReLU(), 
-            nn.MaxPool2d(2, 2), # 16 9 9
-
-
-            nn.Flatten(), # 16*9*9 
-
-            nn.Linear(16*9*9, 64), 
-            nn.ReLU(),
-
-            # nn.Linear(120, 64),
-            # nn.ReLU(),
-
-            nn.Linear(64, 7),
-)
-
-
-
+    logger.info('Build Model from scratch.')
+    model_name = opt.model
+    model = getattr(models, model_name)
 model.to(device)
+logger.info("Loaded modle: "+ model_name)
 
-# preview shape route
-input_shape = next(iter(trainloader))[0][0].shape
-print("Input shape:",input_shape)
-summary(model, input_shape)
-
- 
-# %% continue
-
-
-
-
- 
-
-
-
+# hyp 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-logger.info('Model loaded.')
-
-
-
-# Resume model
 start_epoch, best_acc = 0, 0.0
 if pretrained:
     # Optimizer
@@ -656,9 +579,12 @@ if pretrained:
         epochs += ckpt['epoch']  # finetune additional epochs
 
     del ckpt, state_dict
+scheduler = lr_scheduler.StepLR(optimizer, step_size=300, gamma=2)
+scheduler.last_epoch = start_epoch - 1  # do not move
 
 
-# visual
+
+# visual init
 logger.info('\n[+]visual')
 # Tensorboard
 prefix = colorstr('tensorboard: ')
@@ -673,7 +599,7 @@ if not opt.nowandb:
     if wandb:
         logger.info("Wandb login ...")
         is_wandb_login = wandb.login()
-        # init wandb
+        # init wandb               
         wandb.init(
             # Set entity to specify your username or team name
             # ex: entity="carey",
@@ -681,7 +607,7 @@ if not opt.nowandb:
             project=opt.project, 
             # Track hyperparameters and run metadata
             config=dict(opt.__dict__),
-            id = resume_wandb_id if opt.resume else wandb.util.generate_id(),
+            id = torch.load(weights).get('wandb_id') if opt.resume else wandb.util.generate_id(),
             name=name_inc,
             resume="allow",
             tags = ["explorer"],
@@ -691,7 +617,7 @@ if not opt.nowandb:
 else:
     wandb = None
 
-# log images
+# visual images in 1 batch 
 images, labels, _ = next(iter(trainloader))
 images, labels = images.to(device), labels.to(device)
 images = (images / 2 + 0.5) 
@@ -704,28 +630,30 @@ plot_cls_bar(raw_train.targets, save_dir, raw_train)
 # writer.add_histogram('raw_train_classes', torch.tensor(raw_train.targets), 1)
 # writer.add_histogram('raw_test_classes', torch.tensor(raw_test.targets), 1)
 
-# log summary
-writer.add_text('opt', str(opt.__dict__), 0)
+# visual info 
 logger.info("\n[+]info")
-logger.info(model)
-logger.info("datasets: split_dot:{}, train/test={}/{} \nclasses_count: {}, batch_size:{}".format(
+summary_str = "datasets: split_dot:{}, train/test={}/{} \nclasses_count: {}, batch_size:{}".format(
     split_dot,len(raw_train),len(raw_test),len(classes),batch_size
-))
+)
+# logger.info(model)
+logger.info(summary_str)
+writer.add_text('summary', summary_str, 0)
+writer.add_text('opt', str(opt.__dict__), 0)
 
-# Start Training
+# visual model in bash 
+# input_shape = next(iter(trainloader))[0][0].shape
+# print("Input shape:",input_shape)
+# summary(model, input_shape)
+
+# Start Training >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 logger.info('\n[+]train')
 logger.info('Logging results to ' + str(save_dir))
 logger.info('Starting training for {} epochs...'.format(epochs))
-
-since = time.time()
 best_model_wts = copy.deepcopy(model.state_dict())
-# scheduler
-scheduler = lr_scheduler.StepLR(optimizer, step_size=300, gamma=2)
-scheduler.last_epoch = start_epoch - 1  # do not move
+since = time.time()
 for epoch in range(start_epoch,epochs):
     logging.info("")
     final_epoch = epoch + 1 == epochs
-    # Each epoch has a training and validation phase
 
     model.train()  # Set model to training mode
     running_loss = 0.0
@@ -801,6 +729,7 @@ for epoch in range(start_epoch,epochs):
     # Save
     if (not opt.nosave) or (final_epoch and not opt.evolve):
         ckpt = {
+            'model_name' : opt.model,
             'epoch': epoch,
             'model': deepcopy(model).half(),
             'optimizer_state_dict': optimizer.state_dict(),
@@ -814,7 +743,7 @@ for epoch in range(start_epoch,epochs):
         del ckpt
     # end epoch -----------------------------
 
-
+# finish info
 time_elapsed = time.time() - since
 logger.info('{} epochs completed in {:.0f}m {:.0f}s \n'.format(
     epochs - start_epoch , time_elapsed // 60, time_elapsed % 60)) # epoch should + 1?
@@ -828,50 +757,15 @@ for f in last, best:
         strip_optimizer(f)  # strip optimizers
 
 
-# log end
+# release resource
 writer.close()
 if wandb:
     wandb.summary['best_val_acc'] = best_acc
     wandb.finish()
 torch.cuda.empty_cache()
 
-# %% test
-logger.info('\n[+]test')
-logger.info('loading best model ')
-model.load_state_dict(best_model_wts)
-# will error as sliced
-test(testloader,model,testset=raw_test,is_savecsv=1,opt=opt,save_dir = save_dir) 
-
 logger.info('End!')
 
- 
-
- 
-#%% exp
 
 
-
-# infer(validloader,model,classes,3)
-
-
-
-
-
-
-
-
-
- 
-
-# %% set opt
-# if __name__ == '__main__':
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument('--placeholder', type=str,
-#                         default='blank', help='initial weights path')
-#     opt = parser.parse_args()
-#     print('main end')
-
-
-
- 
  
