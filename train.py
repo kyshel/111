@@ -356,6 +356,7 @@ class Emoji(VisionDataset):
 parser = argparse.ArgumentParser()
 parser.add_argument('--weights', type=str, default='', help='initial weights path, override model')
 parser.add_argument('--repro', action='store_true', help='only save final checkpoint')
+parser.add_argument('--alt_paras', action='store_true', help='change optimizer parameters')
 parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
 parser.add_argument('--notest', action='store_true', help='only test final epoch')
 parser.add_argument('--nowandb', action='store_true', help='disable wandb')
@@ -372,17 +373,58 @@ else:
 
 # overide opt 
 opt.model = 'res18_pre'
-opt.epochs = 60   
+# opt.alt_paras = True  # only for freeze layers
+
+opt.epochs = 30   
 opt.batch = 32
 
 opt.split = 0.8
 opt.workers = 8 
+
 
 opt.repro = True if not isinteractive() else False
 opt.nowandb = True
 opt.project = '28emoji'
 # opt.weights = '28emoji/exp21/weights/best.pt'
 # opt.resume = '28emoji/exp38/weights/last.pt'
+
+
+
+
+transform_train = transforms.Compose(
+    [transforms.ToTensor(),transforms.CenterCrop(38),
+        transforms.Normalize([0.5077, 0.5077, 0.5077],[0.2186, 0.2186, 0.2186])])
+
+
+
+
+
+
+transform_test = transforms.Compose(
+    [transforms.ToTensor(),
+        transforms.Normalize([0.5060, 0.5060, 0.5060],[0.2191, 0.2191, 0.2191])])
+
+# default 
+# transform_train = transforms.Compose(
+#     [transforms.ToTensor(),
+#         transforms.Normalize([0.5077, 0.5077, 0.5077],[0.2186, 0.2186, 0.2186])])
+
+# transform_test = transforms.Compose(
+#     [transforms.ToTensor(),
+#         transforms.Normalize([0.5060, 0.5060, 0.5060],[0.2191, 0.2191, 0.2191])])
+
+
+
+
+
+
+# transform_train = transforms.Compose(
+#     [transforms.ToTensor(),
+#         transforms.Normalize([0.5077, 0.5077, 0.5077],[0.2186, 0.2186, 0.2186])])
+
+# transform_test = transforms.Compose(
+#     [transforms.ToTensor(),
+#         transforms.Normalize([0.5060, 0.5060, 0.5060],[0.2191, 0.2191, 0.2191])])
 
 
 
@@ -488,13 +530,7 @@ logger.info('\n[+]dataset')
 # transform = transforms.Compose(
 #     [transforms.ToTensor(),
 #         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-transform_train = transforms.Compose(
-    [transforms.ToTensor(),
-        transforms.Normalize([0.5077, 0.5077, 0.5077],[0.2186, 0.2186, 0.2186])])
 
-transform_test = transforms.Compose(
-    [transforms.ToTensor(),
-        transforms.Normalize([0.5060, 0.5060, 0.5060],[0.2191, 0.2191, 0.2191])])
 
 
 
@@ -542,7 +578,8 @@ logger.info("Loaded modle: "+ model_name)
 
 # hyp 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+opti_paras = models.opti_paras[model_name] if opt.alt_paras else model.parameters()
+optimizer = optim.SGD(opti_paras, lr=0.001, momentum=0.9)
 start_epoch, best_acc = 0, 0.0
 if pretrained:
     # Optimizer
@@ -609,7 +646,7 @@ images = (images / 2 + 0.5)
 grid = torchvision.utils.make_grid(images)
 writer.add_image('train_images', grid, 0)
 writer.add_graph(model, images)
-# save plot
+# cls distr
 plot_cls_bar(raw_train.targets, save_dir, raw_train)
 # writer.add_image('cls_distri_img', cls_distri_img, 0)
 # writer.add_histogram('raw_train_classes', torch.tensor(raw_train.targets), 1)

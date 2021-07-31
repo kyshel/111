@@ -1,6 +1,7 @@
 
 import torch.nn as nn
 import torch
+from torch.nn import parameter
 import torch.nn.functional as F
 import torchvision
 
@@ -17,6 +18,8 @@ if os.environ['ICH_REPRO'] == '1':
     torch.backends.cudnn.deterministic = True
     g = torch.Generator()
     g.manual_seed(seed)
+
+opti_paras = {}
 
 class Net(nn.Module):
     def __init__(self):
@@ -127,6 +130,8 @@ res18_pre.fc = nn.Linear(res18_pre.fc.in_features, 7)
 
 
 
-
-
-
+res18_pre_fre  = torchvision.models.resnet18(pretrained=True)
+for param in res18_pre_fre.parameters():
+    param.requires_grad = False
+res18_pre_fre.fc = nn.Linear(res18_pre_fre.fc.in_features, 7)
+opti_paras['res18_pre_fre'] = res18_pre_fre.fc.parameters()
