@@ -351,7 +351,7 @@ else:
 
 # opt explicit
 # opt.model = 'res152_pre'
-opt.model = 'basic'
+opt.model = 'vgg11'
 # opt.alt_paras = True  # only for freeze layers
 
 opt.epochs = 30   
@@ -366,7 +366,7 @@ opt.nowandb = True
 opt.project = '28emoji'
 # opt.weights = '28emoji/exp21/weights/best.pt'
 # opt.resume = '28emoji/exp38/weights/last.pt'
-# opt.args = 'args.yaml'
+opt.args = 'args.yaml'
 # opt.notest = True
 # opt.nosave = True
 # opt.notest = True
@@ -437,7 +437,7 @@ if opt.proxy:
 # Reproducibility,  NOT work in notebook!
 seed = random.randint(0,9999)
 if opt.repro:
-    logger.info('\n!!! Using reproducibility !!!')
+    logger.info('\n[+repro]')
     if isinteractive(): logger.info('!!! BUT U R in interative, repro may not work !!!')
     seed = 0
     os.environ['ICH_REPRO'] = '1'
@@ -449,7 +449,7 @@ if opt.repro:
     torch.backends.cudnn.deterministic = True
     g = torch.Generator()
     g.manual_seed(seed)
-    
+    logger.info('seed: {}, ICH_REPRO: {}'.format(seed,os.environ['ICH_REPRO']))
 else: 
     os.environ['ICH_REPRO'] = '0'
     import models

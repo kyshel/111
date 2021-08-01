@@ -26,7 +26,7 @@ pip install -r requirements.txt
 
 
 # logs
-- v15 save with optimzer not striped
+- v15 save .pt with optimzer not striped
 - v14 add model selection
 - v13 logger to local file ok 
 - v12 reproducibility ok

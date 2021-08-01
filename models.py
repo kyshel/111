@@ -122,7 +122,10 @@ def res152_pre():
     m.fc = nn.Linear(m.fc.in_features, 7)
     return m
 
-
+def vgg11():
+    m  = torchvision.models.vgg11(pretrained=True )
+    m.classifier[6] = nn.Linear(4096,7)
+    return m
 
 
 
