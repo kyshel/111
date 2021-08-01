@@ -9,7 +9,12 @@ import os
 import numpy as np
  
 # repro 
-if os.environ['ICH_REPRO'] == '1':
+repro_flag = "ICH_REPRO"
+
+if repro_flag not in os.environ:
+    raise Exception('Please set repro flag: '+repro_flag)
+
+if os.environ[repro_flag] == '1':
     seed = 0
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
     torch.manual_seed(seed)
@@ -19,54 +24,39 @@ if os.environ['ICH_REPRO'] == '1':
     g = torch.Generator()
     g.manual_seed(seed)
 
-opti_paras = {}
+ 
+opti_paras = []
 
-class Net(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        # self.fc1 = nn.Linear(16 * 5 * 5, 120)
-        self.fc1 = nn.Linear(1296, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 7)
+def get(model_name ='basic'):
+    if model_name not in globals():
+        raise Exception( model_name + " model not found, please check valid models in  models.py")
+    return globals()[model_name]()
 
-    def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))      
-        x = self.pool(F.relu(self.conv2(x)))      
-        x = torch.flatten(x, 1) # flatten all dimensions except batch        
-        x = F.relu(self.fc1(x))        
-        x = F.relu(self.fc2(x)) 
-        x = self.fc3(x)
-    
-        return x
+ 
+def basic():
+    return  nn.Sequential( # > 3 48 48
+                nn.Conv2d(3,6,5), # > 6 44 44
+                nn.ReLU(),
+                nn.MaxPool2d(2, 2), # 6 22 22
 
-model_first = Net()
+                nn.Conv2d(6,16,5), # 16 18 18
+                nn.ReLU(), 
+                nn.MaxPool2d(2, 2), # 16 9 9
 
-model_first_seq =  nn.Sequential(
-            nn.Conv2d(3,6,5),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
+                nn.Flatten(), # 16*9*9 
 
-            nn.Conv2d(6,16,5),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
+                nn.Linear(16*9*9, 256), 
+                nn.ReLU(),
+
+                nn.Linear(256, 7),
+    )
 
 
-            nn.Flatten(),
 
-            nn.Linear(1296, 120),
-            nn.ReLU(),
+ 
 
-            nn.Linear(120, 84),
-            nn.ReLU(),
-
-            nn.Linear(84, 7),
-)
-
-
-model_overfit =  nn.Sequential( # > 3 48 48
+def basic_overfit():
+    return nn.Sequential( # > 3 48 48
             nn.Conv2d(3,6,5), # > 6 44 44
             nn.ReLU(),
             nn.MaxPool2d(2, 2), # 6 22 22
@@ -100,47 +90,50 @@ model_overfit =  nn.Sequential( # > 3 48 48
 )
 
 
-model_basic =  nn.Sequential( # > 3 48 48
-            nn.Conv2d(3,6,5), # > 6 44 44
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2), # 6 22 22
-
-            nn.Conv2d(6,16,5), # 16 18 18
-            nn.ReLU(), 
-            nn.MaxPool2d(2, 2), # 16 9 9
-
-            nn.Flatten(), # 16*9*9 
-
-            nn.Linear(16*9*9, 256), 
-            nn.ReLU(),
-
-            nn.Linear(256, 7),
-)
 
 
+def res18():
+    m = torchvision.models.resnet18()
+    m.fc = nn.Linear(res18.fc.in_features, 7)
+    return m
+
+def res18_pre():
+    m  = torchvision.models.resnet18(pretrained=True)
+    m.fc = nn.Linear(m.fc.in_features, 7)
+    return m
+
+def res18_pre_fre():
+    global opti_paras
+    m  = torchvision.models.resnet18(pretrained=True)
+    for param in m.parameters():
+        param.requires_grad = False
+    m.fc = nn.Linear(m.fc.in_features, 7)
+    opti_paras['res18_pre_fre'] = m.fc.parameters()
+    return m
 
 
+def res34_pre():
+    m  = torchvision.models.resnet34(pretrained=True)
+    m.fc = nn.Linear(m.fc.in_features, 7)
+    return m
 
-res18 = torchvision.models.resnet18()
-res18.fc = nn.Linear(res18.fc.in_features, 7)
-
-
-res18_pre  = torchvision.models.resnet18(pretrained=True)
-res18_pre.fc = nn.Linear(res18_pre.fc.in_features, 7)
-
-
-
-res18_pre_fre  = torchvision.models.resnet18(pretrained=True)
-for param in res18_pre_fre.parameters():
-    param.requires_grad = False
-res18_pre_fre.fc = nn.Linear(res18_pre_fre.fc.in_features, 7)
-opti_paras['res18_pre_fre'] = res18_pre_fre.fc.parameters()
+def res152_pre():
+    m  = torchvision.models.resnet152(pretrained=True)
+    m.fc = nn.Linear(m.fc.in_features, 7)
+    return m
 
 
 
 
-res34_pre  = torchvision.models.resnet34(pretrained=True)
-res34_pre.fc = nn.Linear(res34_pre.fc.in_features, 7)
 
-res152_pre  = torchvision.models.resnet152(pretrained=True)
-res152_pre.fc = nn.Linear(res152_pre.fc.in_features, 7)
+
+
+
+
+
+
+
+ 
+
+
+        

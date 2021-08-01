@@ -1,6 +1,6 @@
 # %% preset
 
-
+from shutil import copyfile
 import random  
 from torchsummary import summary
 from collections import Counter
@@ -318,42 +318,20 @@ class Emoji(VisionDataset):
         return img, target, fn
 
 
-
-
-# %% main
-
-
-# %% test
-    # logger.info('\n[+]test')
-    # logger.info('loading best model ')
-    # model.load_state_dict(best_model_wts)
-    # # will error as sliced
-    # test(testloader,model,testset=raw_test,is_savecsv=1,opt=opt,save_dir = save_dir) 
-
-    # logger.info('End!')
+ 
 
  
 
  
-#%% exp
-
-
-
 # infer(validloader,model,classes,3)
 
 
 
 
-
-
-
-
-
- 
-
 # %% set opt
 # if __name__ == '__main__':
 parser = argparse.ArgumentParser()
+parser.add_argument('--args', nargs='?', const=True, default=False,help='load args from file ')
 parser.add_argument('--weights', type=str, default='', help='initial weights path, override model')
 parser.add_argument('--repro', action='store_true', help='only save final checkpoint')
 parser.add_argument('--alt_paras', action='store_true', help='change optimizer parameters')
@@ -371,11 +349,12 @@ else:
     opt = parser.parse_args()
 
 
-# overide opt 
-opt.model = 'res152_pre'
+# opt explicit
+# opt.model = 'res152_pre'
+opt.model = 'basic'
 # opt.alt_paras = True  # only for freeze layers
 
-opt.epochs = 60   
+opt.epochs = 30   
 opt.batch = 32
 
 opt.split = 0.8
@@ -387,8 +366,22 @@ opt.nowandb = True
 opt.project = '28emoji'
 # opt.weights = '28emoji/exp21/weights/best.pt'
 # opt.resume = '28emoji/exp38/weights/last.pt'
+# opt.args = 'args.yaml'
+# opt.notest = True
+# opt.nosave = True
+# opt.notest = True
 
 
+# opt args 
+if opt.args:
+    with open(opt.args) as f:
+        args = argparse.Namespace(**yaml.safe_load(f))  # replace
+        logger.info('\n[+]args \nOverding args:')
+        for k,v in opt.__dict__.items(): # ensure no new args
+            if hasattr(args, k):
+                v_overide =  getattr(args, k)  
+                setattr(opt, k, v_overide)  # override
+                logger.info('{}: {} > {}'.format(k,v,v_overide ))
 
 
 transform_train = transforms.Compose(
@@ -444,7 +437,8 @@ if opt.proxy:
 # Reproducibility,  NOT work in notebook!
 seed = random.randint(0,9999)
 if opt.repro:
-    logger.info('!!! Using reproducibility !!!')
+    logger.info('\n!!! Using reproducibility !!!')
+    if isinteractive(): logger.info('!!! BUT U R in interative, repro may not work !!!')
     seed = 0
     os.environ['ICH_REPRO'] = '1'
     import models
@@ -479,7 +473,7 @@ if opt.resume:
         raise Exception("No need to resume.")
 
 
-# load opt
+# load opt, after resume 
 
 weights = opt.weights
 split_dot = opt.split  
@@ -567,12 +561,12 @@ if pretrained:
     ckpt = torch.load(weights, map_location=device)  # load checkpoint
     state_dict = ckpt['model'].float().state_dict()  # to FP32
     model_name = ckpt['model_name']
-    model = getattr(models, model_name)
+    model = models.get(model_name)
     model.load_state_dict(state_dict, strict=False)  # load
     logger.info('Transferred %g/%g items from %s' % (len(state_dict), len(model.state_dict()), weights))  # report
 else:
     model_name = opt.model
-    model = getattr(models, model_name)
+    model = models.get(model_name)
 model.to(device)
 logger.info("Loaded modle: "+ model_name)
 
@@ -654,8 +648,9 @@ plot_cls_bar(raw_train.targets, save_dir, raw_train)
 
 # visual info 
 logger.info("\n[+]info")
-summary_str = "datasets: split_dot:{}, train/test={}/{} \nclasses_count: {}, batch_size:{}".format(
-    split_dot,len(raw_train),len(raw_test),len(classes),batch_size
+summary_str = "datasets: split_dot:{}, raw_train:raw_test={}/{} \
+    \ntrainset:validset={}/{}  \nclasses_count: {}, batch_size:{}".format(
+    split_dot,len(raw_train),len(raw_test),len(trainset),len(validset),len(classes),batch_size
 )
 # logger.info(model)
 logger.info(summary_str)
@@ -721,12 +716,16 @@ for epoch in range(start_epoch,epochs):
     
     # Validate
     this_best = False
-    pred_list,val_acc,val_loss = test(validloader,
-        model,
-        is_training = True,
-        criterion = criterion,
-        optimizer = optimizer,
-        )
+    val_acc = 0 
+    val_loss = 0
+    if (opt.split != 1) and (not opt.notest or final_epoch):
+        _pred_list,val_acc,val_loss = test(validloader,
+            model,
+            is_training = True,
+            criterion = criterion,
+            optimizer = optimizer,
+            )
+
     if val_acc > best_acc:
         best_acc = val_acc
         best_model = copy.deepcopy(model)
@@ -776,9 +775,11 @@ writer.add_text('summary/best_acc', str(best_acc), 0)
 
 # Strip optimizers
 final = best if best.exists() else last  # final model
-for f in last, best:
+for f in last,best:
     if f.exists():
-        strip_optimizer(f)  # strip optimizers
+        f_striped = f.with_suffix('.strip.pt')
+        copyfile(f, f_striped)
+        strip_optimizer(f_striped)  # strip optimizers
 
 
 # release resource
@@ -788,8 +789,14 @@ if wandb:
     wandb.finish()
 torch.cuda.empty_cache()
 
-logger.info('End!')
+logger.info('End Train!')
 
 
+# %% test
+logger.info('\n[+]test')
+logger.info('loading best model ')
+model.load_state_dict(best_model_wts)
+# will error as sliced
+test(testloader,model,testset=raw_test,is_savecsv=1,opt=opt,save_dir = save_dir) 
 
- 
+logger.info('End Test!')

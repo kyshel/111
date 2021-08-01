@@ -16,12 +16,17 @@ pip install -r requirements.txt
 - none 
 
 # p9
+- add cmds to logger
+- create test.py
+- add opt.emoji_pkl
 - unify dataset
 - repro not work in notebook
 - isinteractive not reliable
 
 
+
 # logs
+- v15 save with optimzer not striped
 - v14 add model selection
 - v13 logger to local file ok 
 - v12 reproducibility ok
