@@ -626,7 +626,7 @@ if not opt.nowandb:
             # Set entity to specify your username or team name
             # ex: entity="carey",
             # Set the project where this run will be logged
-            project=opt.project, 
+            project=Path(opt.project).stem, 
             # Track hyperparameters and run metadata
             config=dict(opt.__dict__),
             id = torch.load(weights).get('wandb_id') if opt.resume else wandb.util.generate_id(),

@@ -1,6 +1,13 @@
 # ich
 ICH (Image Classification Hammer) is used for image classification tasks. 
 
+# usage
+``` bash
+git clone https://github.com/kyshel/ich.git
+cd ich
+pip install -r requirements.txt
+```
+
 # queue
 - use data augmention like transform
 
