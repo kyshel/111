@@ -348,6 +348,8 @@ parser.add_argument('--args', nargs='?', const=True, default=False,help='load ar
 parser.add_argument('--weights', type=str, default='', help='initial weights path, override model')
 parser.add_argument('--repro', action='store_true', help='only save final checkpoint')
 parser.add_argument('--alt_paras', action='store_true', help='change optimizer parameters')
+parser.add_argument('--nopre', action='store_true', help='only save final checkpoint')
+parser.add_argument('--freeze', action='store_true', help='only save final checkpoint')
 parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
 parser.add_argument('--notest', action='store_true', help='only test final epoch')
 parser.add_argument('--nowandb', action='store_true', help='disable wandb')
@@ -362,25 +364,28 @@ else:
     opt = parser.parse_args()
 
 
-# opt explicit
+### opt explicit
+opt.model = 'res18'
 # opt.model = 'res152_pre'
 # opt.model = 'vgg11'
-opt.model = 'vgg19_bn'
+# opt.model = 'vgg19_bn'
+
 # opt.alt_paras = True  # only for freeze layers
 
-opt.epochs = 30  
-opt.batch = 16
+opt.epochs = 3  
+opt.batch = 128
 
 opt.split = 0.8
 opt.workers = 8 
 
 
-opt.repro = True if not isinteractive() else False
+# opt.freeze = True # need opt.model 
+# opt.repro = True if not isinteractive() else False
 opt.nowandb = True
 opt.project = '28emoji'
 # opt.weights = '28emoji/exp21/weights/best.pt'
 # opt.resume = '28emoji/exp38/weights/last.pt'
-opt.args = 'args.yaml'
+# opt.args = 'args.yaml'
 # opt.notest = True
 # opt.nosave = True
 # opt.notest = True
@@ -523,6 +528,7 @@ raw_train = Emoji(root='./data', train=True,
 raw_test = Emoji(root='./data', train=False,
                     transform=transform_test)
 classes = raw_train.classes
+nc = len(classes)
 num_train = int(len(raw_train) * split_dot)
 trainset, validset = \
     random_split(raw_train, [num_train, len(raw_train) - num_train],
@@ -551,12 +557,12 @@ if pretrained:
     ckpt = torch.load(weights, map_location=device)  # load checkpoint
     state_dict = ckpt['model'].float().state_dict()  # to FP32
     model_name = ckpt['model_name']
-    model = models.get(model_name)
+    model = models.get(model_name,nc,opt.freeze,opt.nopre)
     model.load_state_dict(state_dict, strict=False)  # load
     logger.info('Transferred %g/%g items from %s' % (len(state_dict), len(model.state_dict()), weights))  # report
 else:
     model_name = opt.model
-    model = models.get(model_name)
+    model = models.get(model_name,nc,opt.freeze,opt.nopre)
 model.to(device)
 logger.info("Loaded modle: "+ model_name)
 

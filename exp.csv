@@ -9,5 +9,5 @@ exp36,"freeze last layer, result very bad, return to unfreeze ",0.338,res18_pre_
 exp38,"center crop 38, seems not very differ, remove and change to other tricks",0.598,res18_pre,self,32,x,x,x,0.001,0.9
 exp41,"epoch need >60, best current, has big shake",0.6159,res34_pre,self,32,60,2,60+,0.001,0.9
 exp43,"small inc, big shake",0.6213,res152pre,self,32,60,2,60+,0.001,0.9
-exp73,">0.1 inc, 30+epoch ^, ",0.6382,vgg11,self,32,30,6,30+,0.001,0.9
-,,,,,,,,,,
+exp73,"0.1 inc, 30+epoch ^",0.6382,vgg11,self,32,30,6,30+,0.001,0.9
+exp76,"0.1inc,need epoch30+, need 0.001lr- ",0.6480,vgg19,self,32,30,6,30+,0.001,0.9

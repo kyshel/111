@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch
 from torch.nn import parameter
 import torch.nn.functional as F
-import torchvision
+from torchvision import models 
 
 import os 
 import numpy as np
@@ -27,7 +27,7 @@ if os.environ[repro_flag] == '1':
  
 opti_paras = []
 
-def get(model_name ='basic'):
+def get2(model_name ='basic'):
     if model_name not in globals():
         raise Exception( model_name + " model not found, please check valid models in  models.py")
     return globals()[model_name]()
@@ -93,18 +93,18 @@ def basic_overfit():
 
 
 def res18():
-    m = torchvision.models.resnet18()
+    m = models.resnet18()
     m.fc = nn.Linear(res18.fc.in_features, 7)
     return m
 
 def res18_pre():
-    m  = torchvision.models.resnet18(pretrained=True)
+    m  = models.resnet18(pretrained=True)
     m.fc = nn.Linear(m.fc.in_features, 7)
     return m
 
 def res18_pre_fre():
     global opti_paras
-    m  = torchvision.models.resnet18(pretrained=True)
+    m  = models.resnet18(pretrained=True)
     for param in m.parameters():
         param.requires_grad = False
     m.fc = nn.Linear(m.fc.in_features, 7)
@@ -113,36 +113,168 @@ def res18_pre_fre():
 
 
 def res34_pre():
-    m  = torchvision.models.resnet34(pretrained=True)
+    m  = models.resnet34(pretrained=True)
     m.fc = nn.Linear(m.fc.in_features, 7)
     return m
 
 def res152_pre():
-    m  = torchvision.models.resnet152(pretrained=True)
+    m  = models.resnet152(pretrained=True)
     m.fc = nn.Linear(m.fc.in_features, 7)
     return m
 
 def vgg11():
-    m  = torchvision.models.vgg11(pretrained=True )
+    m  = models.vgg11(pretrained=True )
     m.classifier[6] = nn.Linear(4096,7)
     return m
 
 def vgg19():
-    m  = torchvision.models.vgg19(pretrained=True )
+    m  = models.vgg19(pretrained=True )
     m.classifier[6] = nn.Linear(4096,7)
     return m
 
 
 def vgg19_bn():
-    m  = torchvision.models.vgg19_bn(pretrained=True )
+    m  = models.vgg19_bn(pretrained=True )
     m.classifier[6] = nn.Linear(4096,7)
     return m
-
-
-
 
 
  
 
 
+def set_parameter_requires_grad(model, feature_extracting):
+    if feature_extracting:
+        for param in model.parameters():
+            param.requires_grad = False
+
+
+
+def get(model_name, num_classes, feature_extract=False, use_pretrained=True):
+    # Initialize these variables which will be set in this if statement. Each of these
+    #   variables is model specific.
+    model_ft = None
+
+
+    if model_name == "basic":
+        model_ft = nn.Sequential( # > 3 48 48
+                nn.Conv2d(3,6,5), # > 6 44 44
+                nn.ReLU(),
+                nn.MaxPool2d(2, 2), # 6 22 22
+
+                nn.Conv2d(6,16,5), # 16 18 18
+                nn.ReLU(), 
+                nn.MaxPool2d(2, 2), # 16 9 9
+
+                nn.Flatten(), # 16*9*9 
+
+                nn.Linear(16*9*9, 256), 
+                nn.ReLU(),
+
+                nn.Linear(256, num_classes),
+    )
+
+    elif model_name == ("res18" or "res18_pre"):
+        to_call =  getattr(models, 'resnet18')
+        model_ft = to_call(pretrained=use_pretrained)
+
+
+        set_parameter_requires_grad(model_ft, feature_extract)
+        num_ftrs = model_ft.fc.in_features
+        model_ft.fc = nn.Linear(num_ftrs, num_classes)
+
+    elif model_name == ("res34" or "res34_pre"):
+        to_call =  getattr(models, 'resnet34')
+        model_ft = to_call(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        num_ftrs = model_ft.fc.in_features
+        model_ft.fc = nn.Linear(num_ftrs, num_classes)
+
+    elif model_name == ("res152" or "res152_pre" or "resnet152"):
+        to_call =  getattr(models, 'resnet152')
+        model_ft = to_call(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        num_ftrs = model_ft.fc.in_features
+        model_ft.fc = nn.Linear(num_ftrs, num_classes)
+
+    elif model_name in ['resnet18', 'resnet34', 'resnet50', 'resnet101',
+           'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
+           'wide_resnet50_2', 'wide_resnet101_2']:
+        to_call = getattr(models, model_name)
+        model_ft = to_call(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        num_ftrs = model_ft.fc.in_features
+        model_ft.fc = nn.Linear(num_ftrs, num_classes)
+
+
+    elif model_name in [ 'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn',
+    'vgg19_bn', 'vgg19',]:
+        to_call = getattr(models, model_name)
+        model_ft = to_call(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        num_ftrs = model_ft.classifier[6].in_features
+        model_ft.classifier[6] = nn.Linear(num_ftrs,num_classes)
+
+
+
+    elif model_name in ["alexnet"]:
+        """ Alexnet
+        """
+        to_call = getattr(models, model_name)
+        model_ft = to_call(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        num_ftrs = model_ft.classifier[6].in_features
+        model_ft.classifier[6] = nn.Linear(num_ftrs,num_classes)
+
+    elif model_name in ['squeezenet1_0', 'squeezenet1_1']:
+        """ Squeezenet
+        """
+        to_call = getattr(models, model_name)
+        model_ft = to_call(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        model_ft.classifier[1] = nn.Conv2d(512, num_classes, kernel_size=(1,1), stride=(1,1))
+        model_ft.num_classes = num_classes
+        input_size = 224
+
+    elif model_name in ['densenet121', 'densenet169', 'densenet201', 'densenet161']:
+        """ Densenet
+        """
+        to_call = getattr(models, model_name)
+        model_ft = to_call(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        num_ftrs = model_ft.classifier.in_features
+        model_ft.classifier = nn.Linear(num_ftrs, num_classes)
+        input_size = 224
+
+    elif model_name in ['inception_v3']:
+        """ Inception v3
+        Be careful, expects (299,299) sized images and has auxiliary output
+        """
+        to_call = getattr(models, model_name)
+        model_ft = to_call(pretrained=use_pretrained)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        # Handle the auxilary net
+        num_ftrs = model_ft.AuxLogits.fc.in_features
+        model_ft.AuxLogits.fc = nn.Linear(num_ftrs, num_classes)
+        # Handle the primary net
+        num_ftrs = model_ft.fc.in_features
+        model_ft.fc = nn.Linear(num_ftrs,num_classes)
+        input_size = 299
+
+
+
+
+
+
+
+
+    # elif model_name == "":
+    #     model_ft = 
+
+    else:
+        print(model_name,"model Invalid, check models.py, exiting...")
+        exit()
+
+    return model_ft
+
+ 
         
