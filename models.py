@@ -133,7 +133,10 @@ def vgg19():
     return m
 
 
-
+def vgg19_bn():
+    m  = torchvision.models.vgg19_bn(pretrained=True )
+    m.classifier[6] = nn.Linear(4096,7)
+    return m
 
 
 

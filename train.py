@@ -365,11 +365,11 @@ else:
 # opt explicit
 # opt.model = 'res152_pre'
 # opt.model = 'vgg11'
-opt.model = 'vgg19'
+opt.model = 'vgg19_bn'
 # opt.alt_paras = True  # only for freeze layers
 
 opt.epochs = 30  
-opt.batch = 32
+opt.batch = 16
 
 opt.split = 0.8
 opt.workers = 8 
@@ -400,40 +400,15 @@ if opt.args:
 
 
 
-
+# transform
 train_mean, train_std = [0.5077, 0.5077, 0.5077], [0.2186, 0.2186, 0.2186]
 test_mean, test_std = [0.5060, 0.5060, 0.5060], [0.2191, 0.2191, 0.2191]
-
 transform_train = transforms.Compose(
     [transforms.ToTensor(), 
         transforms.Normalize(train_mean,train_std)])
-
 transform_test = transforms.Compose(
     [transforms.ToTensor(),
         transforms.Normalize(test_mean, test_std)])
-
-# default 
-# transform_train = transforms.Compose(
-#     [transforms.ToTensor(),
-#         transforms.Normalize([0.5077, 0.5077, 0.5077],[0.2186, 0.2186, 0.2186])])
-
-# transform_test = transforms.Compose(
-#     [transforms.ToTensor(),
-#         transforms.Normalize([0.5060, 0.5060, 0.5060],[0.2191, 0.2191, 0.2191])])
-
-
-
-
-
-
-# transform_train = transforms.Compose(
-#     [transforms.ToTensor(),
-#         transforms.Normalize([0.5077, 0.5077, 0.5077],[0.2186, 0.2186, 0.2186])])
-
-# transform_test = transforms.Compose(
-#     [transforms.ToTensor(),
-#         transforms.Normalize([0.5060, 0.5060, 0.5060],[0.2191, 0.2191, 0.2191])])
-
 
 
 # opt extend 
