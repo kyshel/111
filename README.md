@@ -1,8 +1,8 @@
 # ich
-ICH(Image Classification Hammer) is used for image classification tasks. 
+ICH (Image Classification Hammer) is used for image classification tasks. 
 
-# devlop info
-Developed in vscode with interactive features
+# queue
+- use data augmention like transform
 
 
 # p1
@@ -24,6 +24,9 @@ Developed in vscode with interactive features
 - v8 resume ok
 - v7 add checkpoint 
 - v6 save last.pt and best.pt
+
+# devlop info
+Developed in vscode with interactive features
 
 
  

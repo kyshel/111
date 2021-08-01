@@ -135,3 +135,12 @@ for param in res18_pre_fre.parameters():
     param.requires_grad = False
 res18_pre_fre.fc = nn.Linear(res18_pre_fre.fc.in_features, 7)
 opti_paras['res18_pre_fre'] = res18_pre_fre.fc.parameters()
+
+
+
+
+res34_pre  = torchvision.models.resnet34(pretrained=True)
+res34_pre.fc = nn.Linear(res34_pre.fc.in_features, 7)
+
+res152_pre  = torchvision.models.resnet152(pretrained=True)
+res152_pre.fc = nn.Linear(res152_pre.fc.in_features, 7)

@@ -372,10 +372,10 @@ else:
 
 
 # overide opt 
-opt.model = 'res18_pre'
+opt.model = 'res152_pre'
 # opt.alt_paras = True  # only for freeze layers
 
-opt.epochs = 30   
+opt.epochs = 60   
 opt.batch = 32
 
 opt.split = 0.8
@@ -392,7 +392,7 @@ opt.project = '28emoji'
 
 
 transform_train = transforms.Compose(
-    [transforms.ToTensor(),transforms.CenterCrop(38),
+    [transforms.ToTensor(), 
         transforms.Normalize([0.5077, 0.5077, 0.5077],[0.2186, 0.2186, 0.2186])])
 
 
