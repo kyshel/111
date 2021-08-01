@@ -215,23 +215,36 @@ def infer(loader,model,classes,batch_index = 0, num = 4 ):
               for j in range(len(images))])
   print('Result: ',match_str)
 
-def show(loader,classes,num=4):
+def show(loader,classes = None ,num=4, mean =(0.5,0.5,0.5),std=(0.5,0.5,0.5)):
     # preview train 
     # get some random training images
+    classes = loader.dataset.classes if not classes else classes
     dataiter = iter(loader)
     images, labels, filenames = dataiter.next()
     images = images[:num]
     # show images
-    imshow(torchvision.utils.make_grid(images))
+    imshow(torchvision.utils.make_grid(images),mean,std)
     print(' '.join('%5s' % classes[labels[j]] for j in range(len(images))))
     
 
-def imshow(img):
+
+def imshow(img,mean =(0.5,0.5,0.5),std=(0.5,0.5,0.5)):
     # show img
-    img = img / 2 + 0.5     # unnormalize
+    img = inverse_normalize(img,mean,std)     # unnormalize
     npimg = img.cpu().numpy()
     plt.imshow(np.transpose(npimg, (1, 2, 0)))
     plt.show()
+
+
+def inverse_normalize(tensor, mean =(0.5,0.5,0.5),std=(0.5,0.5,0.5)):
+    mean = torch.as_tensor(mean, dtype=tensor.dtype, device=tensor.device)
+    std = torch.as_tensor(std, dtype=tensor.dtype, device=tensor.device)
+    if mean.ndim == 1:
+        mean = mean.view(-1, 1, 1)
+    if std.ndim == 1:
+        std = std.view(-1, 1, 1)
+    tensor.mul_(std).add_(mean)
+    return tensor
 
 # %% dataset   
 class Emoji(VisionDataset):
@@ -351,10 +364,11 @@ else:
 
 # opt explicit
 # opt.model = 'res152_pre'
-opt.model = 'vgg11'
+# opt.model = 'vgg11'
+opt.model = 'basic'
 # opt.alt_paras = True  # only for freeze layers
 
-opt.epochs = 30   
+opt.epochs = 3   
 opt.batch = 32
 
 opt.split = 0.8
@@ -384,18 +398,19 @@ if opt.args:
                 logger.info('{}: {} > {}'.format(k,v,v_overide ))
 
 
+
+
+
+train_mean, train_std = [0.5077, 0.5077, 0.5077], [0.2186, 0.2186, 0.2186]
+test_mean, test_std = [0.5060, 0.5060, 0.5060], [0.2191, 0.2191, 0.2191]
+
 transform_train = transforms.Compose(
     [transforms.ToTensor(), 
-        transforms.Normalize([0.5077, 0.5077, 0.5077],[0.2186, 0.2186, 0.2186])])
-
-
-
-
-
+        transforms.Normalize(train_mean,train_std)])
 
 transform_test = transforms.Compose(
     [transforms.ToTensor(),
-        transforms.Normalize([0.5060, 0.5060, 0.5060],[0.2191, 0.2191, 0.2191])])
+        transforms.Normalize(test_mean, test_std)])
 
 # default 
 # transform_train = transforms.Compose(
@@ -636,7 +651,7 @@ else:
 # visual images in 1 batch 
 images, labels, _ = next(iter(trainloader))
 images, labels = images.to(device), labels.to(device)
-images = (images / 2 + 0.5) 
+images = inverse_normalize(images,train_mean,train_std)
 grid = torchvision.utils.make_grid(images)
 writer.add_image('train_images', grid, 0)
 writer.add_graph(model, images)
@@ -764,12 +779,13 @@ for epoch in range(start_epoch,epochs):
         del ckpt
     # end epoch -----------------------------
 
-# finish info
+# summary  
 time_elapsed = time.time() - since
-logger.info('{} epochs completed in {:.0f}m {:.0f}s \n'.format(
-    epochs - start_epoch , time_elapsed // 60, time_elapsed % 60)) # epoch should + 1?
-logger.info('Best val Acc: {:4f}'.format(best_acc))
-writer.add_text('summary/best_acc', str(best_acc), 0)
+msg_sum = '{} epochs completed in {:.0f}m {:.0f}s \n\n'.format(
+    epochs - start_epoch , time_elapsed // 60, time_elapsed % 60) # epoch should + 1?
+msg_sum += 'Best val Acc: {:4f}'.format(best_acc)
+logger.info(msg_sum) 
+writer.add_text('msg_sum', msg_sum, 0)
 
 
 

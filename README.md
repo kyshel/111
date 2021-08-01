@@ -11,6 +11,9 @@ pip install -r requirements.txt
 # queue
 - use data augmention like transform
 
+# meme
+- DO NOT improve batch > 32, current use 32 as base
+
 
 # p1
 - none 
