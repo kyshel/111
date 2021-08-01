@@ -208,6 +208,9 @@ def get(model_name, num_classes, feature_extract=False, use_pretrained=True):
 
     elif model_name in [ 'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn',
     'vgg19_bn', 'vgg19',]:
+        torch.use_deterministic_algorithms(False)
+        print("Warning: torch.use_deterministic_algorithms set to FALSE")
+        
         to_call = getattr(models, model_name)
         model_ft = to_call(pretrained=use_pretrained)
         set_parameter_requires_grad(model_ft, feature_extract)

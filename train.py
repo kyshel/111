@@ -347,6 +347,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--args', nargs='?', const=True, default=False,help='load args from file ')
 parser.add_argument('--weights', type=str, default='', help='initial weights path, override model')
 parser.add_argument('--repro', action='store_true', help='only save final checkpoint')
+parser.add_argument('--repro2', action='store_true', help='only save final checkpoint')
 parser.add_argument('--alt_paras', action='store_true', help='change optimizer parameters')
 parser.add_argument('--nopre', action='store_true', help='only save final checkpoint')
 parser.add_argument('--freeze', action='store_true', help='only save final checkpoint')
@@ -365,7 +366,7 @@ else:
 
 
 ### opt explicit
-opt.model = 'res18'
+opt.model = 'vgg11'
 # opt.model = 'res152_pre'
 # opt.model = 'vgg11'
 # opt.model = 'vgg19_bn'
@@ -380,7 +381,7 @@ opt.workers = 8
 
 
 # opt.freeze = True # need opt.model 
-# opt.repro = True if not isinteractive() else False
+opt.repro = True if not isinteractive() else False
 opt.nowandb = True
 opt.project = '28emoji'
 # opt.weights = '28emoji/exp21/weights/best.pt'
@@ -451,7 +452,7 @@ else:
     torch.use_deterministic_algorithms(False) # for notenook!
     g = torch.Generator()
     g.manual_seed(seed)
-
+ 
 
 # resume
 if opt.resume:
