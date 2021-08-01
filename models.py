@@ -127,7 +127,10 @@ def vgg11():
     m.classifier[6] = nn.Linear(4096,7)
     return m
 
-
+def vgg19():
+    m  = torchvision.models.vgg19(pretrained=True )
+    m.classifier[6] = nn.Linear(4096,7)
+    return m
 
 
 

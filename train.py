@@ -365,10 +365,10 @@ else:
 # opt explicit
 # opt.model = 'res152_pre'
 # opt.model = 'vgg11'
-opt.model = 'basic'
+opt.model = 'vgg19'
 # opt.alt_paras = True  # only for freeze layers
 
-opt.epochs = 3   
+opt.epochs = 30  
 opt.batch = 32
 
 opt.split = 0.8
