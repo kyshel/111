@@ -153,6 +153,8 @@ def get(model_name, num_classes, feature_extract=False, use_pretrained=True):
     # Initialize these variables which will be set in this if statement. Each of these
     #   variables is model specific.
     model_ft = None
+    if feature_extract:
+        print("Freeze enbled!")
 
 
     if model_name == "basic":
@@ -264,10 +266,28 @@ def get(model_name, num_classes, feature_extract=False, use_pretrained=True):
         input_size = 299
 
 
+    # elif model_name in ['googlenet']:
+    #     to_call = getattr(models, model_name)
+    #     model_ft = to_call(pretrained=use_pretrained)
+    #     set_parameter_requires_grad(model_ft, feature_extract)
+    #     num_ftrs = model_ft.fc.in_features
+    #     model_ft.fc = nn.Linear(num_ftrs, num_classes)
 
 
+    elif model_name in ['efficientnet-b0', 'efficientnet-b1', 'efficientnet-b2', 'efficientnet-b3',
+    'efficientnet-b4', 'efficientnet-b5', 'efficientnet-b6', 'efficientnet-b7',
+    'efficientnet-b8',]:
+        # to_call = getattr(models, model_name)
+        # model_ft = to_call(pretrained=use_pretrained)
+        # set_parameter_requires_grad(model_ft, feature_extract)
+        # num_ftrs = model_ft.fc.in_features
+        # model_ft.fc = nn.Linear(num_ftrs, num_classes)
 
-
+        from efficientnet_pytorch import EfficientNet
+        model_ft = EfficientNet.from_pretrained(model_name)
+        set_parameter_requires_grad(model_ft, feature_extract)
+        num_ftrs = model_ft._fc.in_features
+        model_ft._fc = nn.Linear(num_ftrs, num_classes)
 
 
     # elif model_name == "":

@@ -118,14 +118,15 @@ def test(loader,
 
     if is_training:
         device = next(model.parameters()).device  # get model device
-        running_loss = 0.0
-        running_corrects = 0
+        
         cols = ('','','val_loss','val_acc')
         # cols = ('val_loss','val_acc','','')
     else:
         logger.info("Predicting test dataset...")
         device = torch.device('cuda:0' if torch.cuda.is_available()  else 'cpu')
 
+    running_loss = 0.0
+    running_corrects = 0
     val_acc,val_loss = 0,0
     pred_list = []
     
@@ -152,14 +153,13 @@ def test(loader,
                 pbar.set_description(cols_str, refresh=False)
        
         
-    if is_training:
-        epoch_loss = running_loss / len(loader.dataset)
-        epoch_acc = running_corrects.double() / len(loader.dataset)
-        s = ('%30.4g' + '%10.4g' * 1) % (epoch_loss,epoch_acc)
-        # s = ('%10.4g' + '%10.4g' * 1) % (epoch_loss,epoch_acc)
-        logger.info(s)
-        val_acc = epoch_acc
-        val_loss = epoch_loss
+        if is_training:
+            val_loss = running_loss / len(loader.dataset)
+            val_acc = running_corrects.double() / len(loader.dataset)
+            s = ('%30.4g' + '%10.4g' * 1) % (val_loss,val_acc)
+            # s = ('%10.4g' + '%10.4g' * 1) % (epoch_loss,epoch_acc)
+            logger.info(s)
+ 
 
   
     # savecsv
@@ -366,30 +366,31 @@ else:
 
 
 ### opt explicit
-opt.model = 'vgg11'
+
 # opt.model = 'res152_pre'
 # opt.model = 'vgg11'
-# opt.model = 'vgg19_bn'
+# opt.model = 'vgg19_bn' googlenet efficientnet-b0
 
 # opt.alt_paras = True  # only for freeze layers
 
-opt.epochs = 3  
-opt.batch = 128
+opt.model = 'efficientnet-b7'
+opt.epochs = 30  
+opt.batch = 32
 
 opt.split = 0.8
-opt.workers = 8 
-
-
-# opt.freeze = True # need opt.model 
-opt.repro = True if not isinteractive() else False
+opt.repro = True  
 opt.nowandb = True
 opt.project = '28emoji'
+opt.workers = 8 
+# opt.freeze = True # need opt.model 
+# opt.proxy = True
 # opt.weights = '28emoji/exp21/weights/best.pt'
 # opt.resume = '28emoji/exp38/weights/last.pt'
 # opt.args = 'args.yaml'
 # opt.notest = True
 # opt.nosave = True
 # opt.notest = True
+
 
 
 # opt args 
@@ -434,7 +435,6 @@ if opt.proxy:
 seed = random.randint(0,9999)
 if opt.repro:
     logger.info('\n[+repro]')
-    if isinteractive(): logger.info('!!! BUT U R in interative, repro may not work !!!')
     seed = 0
     os.environ['ICH_REPRO'] = '1'
     import models
@@ -445,6 +445,9 @@ if opt.repro:
     torch.backends.cudnn.deterministic = True
     g = torch.Generator()
     g.manual_seed(seed)
+    if isinteractive(): 
+        logger.info(' U R in interative, torch.use_deterministic_algorithms set False !')
+        torch.use_deterministic_algorithms(False)
     logger.info('seed: {}, ICH_REPRO: {}'.format(seed,os.environ['ICH_REPRO']))
 else: 
     os.environ['ICH_REPRO'] = '0'
@@ -636,7 +639,13 @@ images, labels = images.to(device), labels.to(device)
 images = inverse_normalize(images,train_mean,train_std)
 grid = torchvision.utils.make_grid(images)
 writer.add_image('train_images', grid, 0)
-writer.add_graph(model, images)
+
+try:
+    writer.add_graph(model, images)
+except Exception as e:
+    logger.info(e)
+
+
 # cls distr
 plot_cls_bar(raw_train.targets, save_dir, raw_train)
 # writer.add_image('cls_distri_img', cls_distri_img, 0)
