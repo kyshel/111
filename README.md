@@ -25,6 +25,7 @@ pip install -r requirements.txt
 - unify dataset
 - repro not work in notebook
 - isinteractive not reliable
+- add repro2 for vgg 
 
 
 
