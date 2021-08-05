@@ -90,6 +90,10 @@ def plot_cls_bar(cls_list, save_dir, dataset = None):
 
 def isinteractive():  # unreliable!
     # Warning! this may determine wrong
+
+    if 0 == 1: # remove error msg
+        get_ipython = 1 
+
     try:
         shell = get_ipython().__class__.__name__
         if shell in ['ZMQInteractiveShell','TerminalInteractiveShell','Shell']:
@@ -369,12 +373,12 @@ else:
 
 # opt.model = 'res152_pre'
 # opt.model = 'vgg11'
-# opt.model = 'vgg19_bn' googlenet efficientnet-b0
+# opt.model = 'vgg19_bn' basic googlenet efficientnet-b0
 
 # opt.alt_paras = True  # only for freeze layers
 
-opt.model = 'efficientnet-b7'
-opt.epochs = 30  
+opt.model = 'basic'
+opt.epochs = 3  
 opt.batch = 32
 
 opt.split = 0.8
