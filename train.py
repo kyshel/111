@@ -275,7 +275,7 @@ class Emoji2(VisionDataset):
             target_transform: Optional[Callable] = None,
     ) -> None:
 
-        super(Emoji, self).__init__(root, transform=transform,
+        super(Emoji2, self).__init__(root, transform=transform,
                                     target_transform=target_transform)
 
         self.train = train  # training set or test set
@@ -375,6 +375,7 @@ parser.add_argument('--kfold', nargs='?', const=True, default=False, help='resum
 parser.add_argument('--skfold', nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--seed', type=int, default='0', help='set seed for repro')
 parser.add_argument('--split', type=float,   default='0.8', help='set seed for repro')
+parser.add_argument('--data', type=str, default='Rawset', help='set seed for repro')
 
 if isinteractive(): # not reliable, temp debug only  
     logger.info('[+]notebook \nNotebook mode ')
@@ -396,7 +397,8 @@ opt.model = 'basic'
 opt.epochs = 10
 opt.batch = 32
 
-opt.skfold = '1/5' # try
+opt.dataset = 'Emoji'   # Emoji Covid
+opt.skfold = '1/5' 
 opt.repro = True  
 opt.nowandb = True
 opt.project = '28emoji_lo'
@@ -541,11 +543,21 @@ except Exception:
 # dataset
 logger.info('\n[+]dataset')
 # %% kfold 
-from datasets import Emoji
-raw_train = Emoji(root='./data', train=True,
+import datasets
+
+rawset =  getattr(datasets, opt.dataset)
+raw_train = rawset(root='./input', train=True,
                     transform=transform_train)
-raw_test = Emoji(root='./data', train=False,
+raw_test = rawset(root='./input', train=False,
                     transform=transform_test)
+
+# from datasets import Emoji
+# raw_train = Emoji(root='./data', train=True,
+#                     transform=transform_train)
+# raw_test = Emoji(root='./data', train=False,
+#                     transform=transform_test)
+
+
 classes = raw_train.classes
 nc = len(classes)
 if opt.kfold or opt.skfold:  # fold, will ignore split_dot
@@ -581,7 +593,7 @@ testloader = torch.utils.data.DataLoader(raw_test, batch_size=batch_size,
                                         shuffle=False, num_workers=workers,
                                         worker_init_fn=seed_worker,
                                         generator=g)
-logger.info("Dataset loaded.")
+logger.info("Dataset loaded: " + opt.dataset)
 
 
 # model

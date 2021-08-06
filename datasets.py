@@ -1,15 +1,19 @@
+# datasets
+
+# preset
 from torchvision.datasets.vision import VisionDataset
 import torch
 import torch.nn as nn
 from torch.nn import parameter
 import torch.nn.functional as F
 from torchvision import models 
-
 import os 
 import numpy as np
 from typing import Any, Callable, Optional, Tuple
 import ax
 from PIL import Image
+from torch.utils.data import Dataset
+import pandas as pd
 
 # repro >>> start
 repro_flag = "ICH_REPRO"
@@ -26,11 +30,10 @@ if os.environ[repro_flag] == '1':
     torch.backends.cudnn.deterministic = True
     g = torch.Generator()
     g.manual_seed(seed)
-
 # repro <<< end 
 
 
-
+# Emoji
 class Emoji(VisionDataset):
     pkl_fp = '../03save.pkl'
     classes = ('angry', 'disgusted', 'fearful',
@@ -116,5 +119,97 @@ class Emoji(VisionDataset):
 
 
  
+
+class Rawset(VisionDataset):
+    _repr_indent = 4
+
+    def __init__(
+            self,
+            root: str,
+            transforms: Optional[Callable] = None,
+            transform: Optional[Callable] = None,
+            target_transform: Optional[Callable] = None,
+    ) -> None:
+         pass
+
+    def __getitem__(self, index: int) -> Any:
+         pass
+
+    def __len__(self) -> int:
+         pass
+
+ 
+
+
+class Covid(Dataset):
+    """Face Landmarks dataset."""
+
+    cats = ['0neg','1typical','2indeter','3atypical']
+    classes = cats
+
+    def __init__(self, 
+                 root =  '03png/train' ,
+                 csv = 'train_study_level.csv',
+                 obj = '11data/train_imginfo.obj',
+                 train=True, transform=None, ):
+        """
+        Args:
+            root
+        """
+        self.csv = csv
+        self.obj = obj
+        self.root = root     
+        self.transform = transform
+        self.train = train   # trainset or testset
+
+
+        self.img2cat_list = self.get_img2cat_list()   
+
+    def __len__(self):
+        return len(self.img2cat_list)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+        
+
+        catid = self.img2cat_list[idx][1] 
+        imgid = self.img2cat_list[idx][0]
+
+        fn = imgid + '.png'
+        fp = os.path.join(self.root,  fn)
+        im = Image.open(fp).convert('RGB')
+        # pix = np.array(im)
+        pix = im
+
+        if self.transform:
+            pix = self.transform(pix)
+ 
+        return pix,catid,imgid
+
+    def get_img2cat_list(self):
+        # snip, load img2cat_list 
+        csv = self.csv
+        obj = self.obj
+
+        df = pd.read_csv(csv)
+
+        study2cat_map={}
+        for i, row in df.iterrows():
+            for i_col in range(1,5):
+                if row[i_col] == 1:
+                    study2cat_map[ row[0].split('_')[0]] = i_col - 1
+
+        imgdict = ax.load_obj(obj,silent = True)
+        img2cat_list = []
+        for k,v in imgdict.items():
+            study = v['study_id']
+            if self.train:
+                img2cat_list += [[k,study2cat_map[study] ]]
+            else:
+                img2cat_list += [[k,-1 ]]
+
+    
+        return img2cat_list
 
  
