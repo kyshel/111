@@ -260,7 +260,7 @@ def inverse_normalize(tensor, mean =(0.5,0.5,0.5),std=(0.5,0.5,0.5)):
     return tensor
 
 # %% dataset   
-class Emoji(VisionDataset):
+class Emoji2(VisionDataset):
     pkl_fp = '../03save.pkl'
     classes = ('angry', 'disgusted', 'fearful',
             'happy', 'neutral', 'sad', 'surprised')
@@ -377,10 +377,10 @@ parser.add_argument('--seed', type=int, default='0', help='set seed for repro')
 parser.add_argument('--split', type=float,   default='0.8', help='set seed for repro')
 
 if isinteractive(): # not reliable, temp debug only  
-    logger.info('[+]notebook ')
+    logger.info('[+]notebook \nNotebook mode ')
     opt = parser.parse_args(args=[]) 
 else:
-    logger.info('[+]bash ')
+    logger.info('[+]bash \nBash mode')
     opt = parser.parse_args()
     
 
@@ -389,21 +389,21 @@ else:
 
 # opt.model = 'res152_pre'
 # opt.model = 'vgg11'
-# opt.model = 'vgg19_bn' basic googlenet efficientnet-b0 resh
+# opt.model = 'vgg19_bn' basic googlenet efficientnet-b0   res18
 # opt.alt_paras = True  # only for freeze layers
 
-opt.model = 'efficientnet-b0'
-opt.epochs = 10  
+opt.model = 'basic'
+opt.epochs = 10
 opt.batch = 32
 
 opt.skfold = '1/5' # try
 opt.repro = True  
 opt.nowandb = True
-opt.project = '28emoji'
+opt.project = '28emoji_lo'
 opt.workers = 8
-opt.seed = 42 
+opt.seed = 0 
 # opt.split = 0.8 # no-fold
-opt.freeze = True # need opt.model 
+# opt.freeze = True # need opt.model 
 # opt.proxy = True
 # opt.weights = '28emoji/exp21/weights/best.pt'
 # opt.resume = '28emoji/exp38/weights/last.pt'
@@ -541,27 +541,21 @@ except Exception:
 # dataset
 logger.info('\n[+]dataset')
 # %% kfold 
+from datasets import Emoji
 raw_train = Emoji(root='./data', train=True,
                     transform=transform_train)
 raw_test = Emoji(root='./data', train=False,
                     transform=transform_test)
 classes = raw_train.classes
 nc = len(classes)
-
-# num_train = int(len(raw_train) * split_dot)
-# trainset, validset = \
-#     random_split(raw_train, [num_train, len(raw_train) - num_train],
-#                     generator=g)
-
-  
 if opt.kfold or opt.skfold:  # fold, will ignore split_dot
     fold_str = opt.kfold if opt.kfold else opt.skfold
     nf, cf = int(fold_str.split('/')[1]),int(fold_str.split('/')[0]) # num-fold,current-fold
     if opt.kfold:
-        logger.info('KFold @'+ fold_str)
+        logger.info('KFold: '+ fold_str)
         fold_obj = KFold(n_splits=nf, random_state=seed, shuffle=True)
     elif opt.skfold:
-        logger.info('StratifiedKFold @' + fold_str)
+        logger.info('StratifiedKFold: ' + fold_str)
         fold_obj = StratifiedKFold(n_splits=nf, random_state=seed, shuffle=True)
 
     for i_fold, ids in enumerate(fold_obj.split(raw_train,raw_train.targets)):
@@ -592,7 +586,6 @@ logger.info("Dataset loaded.")
 
 # model
 logger.info('\n[+]model')
-
 pretrained = weights.endswith('.pt')
 if pretrained:
     ckpt = torch.load(weights, map_location=device)  # load checkpoint
@@ -609,22 +602,20 @@ logger.info("Loaded modle: "+ model_name)
 
 # hyp 
 criterion = nn.CrossEntropyLoss()
-# opti_paras = models.opti_paras[model_name] if opt.alt_paras else model.parameters()
-
-
 params_to_update = model.parameters()
-print("Params to learn:")
+need_learn = ''
 if opt.freeze:
+    logger.info("Params to learn:")
     params_to_update = []
     for name,param in model.named_parameters():
         if param.requires_grad == True:
             params_to_update.append(param)
-            print("\t",name)
+            logger.info("\t",name)
 else:
     for name,param in model.named_parameters():
         if param.requires_grad == True:
-            print("\t",name)
-
+            need_learn += name + ', '
+    # logger.info("Params to learn: "+ need_learn) # too many info
 optimizer = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
 start_epoch, best_acc = 0, 0.0
 if pretrained:
@@ -632,11 +623,9 @@ if pretrained:
     if ckpt['optimizer_state_dict'] is not None:
         optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         best_acc = ckpt['best_acc']
-
     # Results
     if ckpt.get('training_results') is not None:
         results_file.write_text(ckpt['training_results'])  # write results.txt
-
     # Epochs
     start_epoch = ckpt['epoch'] + 1
     if opt.resume:
@@ -645,7 +634,6 @@ if pretrained:
         logger.info('%s has been trained for %g epochs. Fine-tuning for %g additional epochs.' %
                     (weights, ckpt['epoch'], epochs))
         epochs += ckpt['epoch']  # finetune additional epochs
-
     del ckpt, state_dict
 scheduler = lr_scheduler.StepLR(optimizer, step_size=300, gamma=2)
 scheduler.last_epoch = start_epoch - 1  # do not move
@@ -684,21 +672,18 @@ if not opt.nowandb:
         logger.info('Wandb not installed, manual install: pip install wandb')
 else:
     wandb = None
-
 # visual images in 1 batch 
 images, labels, _ = next(iter(trainloader))
 images, labels = images.to(device), labels.to(device)
 images = inverse_normalize(images,train_mean,train_std)
 grid = torchvision.utils.make_grid(images)
 writer.add_image('train_images', grid, 0)
-
+# visual model 
 try:
     writer.add_graph(model, images)
 except Exception as e:
     logger.info(e)
-
-
-# cls distr
+# visual cls distri 
 plot_cls_bar(raw_train.targets, save_dir, raw_train)
 # writer.add_image('cls_distri_img', cls_distri_img, 0)
 # writer.add_histogram('raw_train_classes', torch.tensor(raw_train.targets), 1)
@@ -708,11 +693,11 @@ plot_cls_bar(raw_train.targets, save_dir, raw_train)
 logger.info("\n[+]info")
 dataset_msg = 'No msg'
 if opt.kfold:
-    dataset_msg = "Kfold @" + opt.kfold
+    dataset_msg = "Kfold: " + opt.kfold
 elif opt.skfold:
-    dataset_msg = "StratifiedKFold @" + opt.skfold
+    dataset_msg = "StratifiedKFold: " + opt.skfold
 else:
-    dataset_msg = "Split_dot: @" + split_dot
+    dataset_msg = "Split_dot: " + str(split_dot)
 summary_str = "- dataset: {}".format(dataset_msg)
 summary_str += "  raw_train:{},raw_test:{}, trainset:{}, validset:{}, nc:{}, batch:{}".format(
      len(raw_train),len(raw_test),len(trainset),len(validset),len(classes),batch_size

@@ -8,7 +8,7 @@ from torchvision import models
 import os 
 import numpy as np
  
-# repro 
+# repro >>> start
 repro_flag = "ICH_REPRO"
 repro_seed = "ICH_SEED"
 if repro_flag not in os.environ:
@@ -24,7 +24,7 @@ if os.environ[repro_flag] == '1':
     g = torch.Generator()
     g.manual_seed(seed)
 
-
+# repro <<< end 
 
  
 
@@ -302,5 +302,6 @@ def get(model_name, num_classes, feature_extract=False, use_pretrained=True):
 
     return model_ft
 
- 
-        
+
+
+
