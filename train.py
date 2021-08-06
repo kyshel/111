@@ -389,10 +389,10 @@ else:
 
 # opt.model = 'res152_pre'
 # opt.model = 'vgg11'
-# opt.model = 'vgg19_bn' basic googlenet efficientnet-b0
+# opt.model = 'vgg19_bn' basic googlenet efficientnet-b0 resh
 # opt.alt_paras = True  # only for freeze layers
 
-opt.model = 'basic'
+opt.model = 'efficientnet-b0'
 opt.epochs = 10  
 opt.batch = 32
 
@@ -403,7 +403,7 @@ opt.project = '28emoji'
 opt.workers = 8
 opt.seed = 42 
 # opt.split = 0.8 # no-fold
-# opt.freeze = True # need opt.model 
+opt.freeze = True # need opt.model 
 # opt.proxy = True
 # opt.weights = '28emoji/exp21/weights/best.pt'
 # opt.resume = '28emoji/exp38/weights/last.pt'
@@ -503,7 +503,6 @@ batch_size = opt.batch
 epochs = opt.epochs
 save_dir = Path(opt.save_dir)
 wdir = save_dir / 'weights'
-
 # Directories
 wdir.mkdir(parents=True, exist_ok=True)  # make dir
 last = wdir / 'last.pt'
@@ -511,7 +510,6 @@ best = wdir / 'best.pt'
 results_file = save_dir / 'results.txt'
 logger.addHandler(logging.FileHandler(save_dir / 'logger.txt')) 
 logger.info('\n[+]opt\n' + json.dumps(opt.__dict__, sort_keys=True) )
-
 # Save run settings
 # with open(save_dir / 'hyp.yaml', 'w') as f:
 #     yaml.safe_dump(hyp, f, sort_keys=False)
@@ -543,8 +541,6 @@ except Exception:
 # dataset
 logger.info('\n[+]dataset')
 # %% kfold 
-
-
 raw_train = Emoji(root='./data', train=True,
                     transform=transform_train)
 raw_test = Emoji(root='./data', train=False,
@@ -614,8 +610,22 @@ logger.info("Loaded modle: "+ model_name)
 # hyp 
 criterion = nn.CrossEntropyLoss()
 # opti_paras = models.opti_paras[model_name] if opt.alt_paras else model.parameters()
-opti_paras = model.fc.parameters() if opt.freeze else model.parameters()
-optimizer = optim.SGD(opti_paras, lr=0.001, momentum=0.9)
+
+
+params_to_update = model.parameters()
+print("Params to learn:")
+if opt.freeze:
+    params_to_update = []
+    for name,param in model.named_parameters():
+        if param.requires_grad == True:
+            params_to_update.append(param)
+            print("\t",name)
+else:
+    for name,param in model.named_parameters():
+        if param.requires_grad == True:
+            print("\t",name)
+
+optimizer = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
 start_epoch, best_acc = 0, 0.0
 if pretrained:
     # Optimizer
@@ -696,7 +706,6 @@ plot_cls_bar(raw_train.targets, save_dir, raw_train)
 
 # visual info 
 logger.info("\n[+]info")
-
 dataset_msg = 'No msg'
 if opt.kfold:
     dataset_msg = "Kfold @" + opt.kfold
@@ -705,8 +714,7 @@ elif opt.skfold:
 else:
     dataset_msg = "Split_dot: @" + split_dot
 summary_str = "- dataset: {}".format(dataset_msg)
-summary_str += "  raw_train:raw_test={}/{} \
-    \ntrainset:validset={}/{}  \nclasses_count: {}, batch_size:{}".format(
+summary_str += "  raw_train:{},raw_test:{}, trainset:{}, validset:{}, nc:{}, batch:{}".format(
      len(raw_train),len(raw_test),len(trainset),len(validset),len(classes),batch_size
 )
 # logger.info(model)
