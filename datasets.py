@@ -120,7 +120,7 @@ class Emoji(VisionDataset):
 
  
 
-class Rawset(VisionDataset):
+class Rawset(VisionDataset):  # delete 
     _repr_indent = 4
 
     def __init__(
@@ -148,9 +148,9 @@ class Covid(Dataset):
     classes = cats
 
     def __init__(self, 
-                 root =  '03png/train' ,
-                 csv = 'train_study_level.csv',
-                 obj = '11data/train_imginfo.obj',
+                 root =  '../03png/train' ,
+                 csv = '../00raw/train_study_level.csv',
+                 obj = '../11data/train_imginfo.obj',
                  train=True, transform=None, ):
         """
         Args:
@@ -161,22 +161,32 @@ class Covid(Dataset):
         self.root = root     
         self.transform = transform
         self.train = train   # trainset or testset
+        self.pid2cid = self.get_pid2cid()   
+
+        targets = []
+        filenames = []
+        for pid,cid in self.pid2cid:
+            targets+= [cid]
+            filenames += [pid]
+
+        self.targets = targets
+        self.filenames = filenames
 
 
-        self.img2cat_list = self.get_img2cat_list()   
+        
 
     def __len__(self):
-        return len(self.img2cat_list)
+        return len(self.pid2cid)
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
         
 
-        catid = self.img2cat_list[idx][1] 
-        imgid = self.img2cat_list[idx][0]
+        cid = self.pid2cid[idx][1] 
+        pid = self.pid2cid[idx][0]
 
-        fn = imgid + '.png'
+        fn = pid + '.png'
         fp = os.path.join(self.root,  fn)
         im = Image.open(fp).convert('RGB')
         # pix = np.array(im)
@@ -185,10 +195,10 @@ class Covid(Dataset):
         if self.transform:
             pix = self.transform(pix)
  
-        return pix,catid,imgid
+        return pix,cid,pid
 
-    def get_img2cat_list(self):
-        # snip, load img2cat_list 
+    def get_pid2cid(self): # [['pic1',1],['pic2',2]]
+        # snip, load pid2cid 
         csv = self.csv
         obj = self.obj
 
@@ -201,15 +211,15 @@ class Covid(Dataset):
                     study2cat_map[ row[0].split('_')[0]] = i_col - 1
 
         imgdict = ax.load_obj(obj,silent = True)
-        img2cat_list = []
+        pid2cid = []
         for k,v in imgdict.items():
             study = v['study_id']
             if self.train:
-                img2cat_list += [[k,study2cat_map[study] ]]
+                pid2cid += [[k,study2cat_map[study] ]]
             else:
-                img2cat_list += [[k,-1 ]]
+                pid2cid += [[k,-1 ]]
 
     
-        return img2cat_list
+        return pid2cid
 
  

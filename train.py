@@ -177,7 +177,7 @@ def test(loader,
   
     # savecsv
     if is_savecsv:
-        fn_list = loader.dataset.get_filenames()
+        fn_list = loader.dataset.filenames
         df = pd.DataFrame(columns=['filename','cid'])
         df['filename'] = fn_list
         df['cid'] = pred_list
@@ -186,18 +186,18 @@ def test(loader,
         logger.info('Done! Check csv: '+ unified_fp )
 
         # for _emoji only
-        df = pd.read_csv('../02read/sample_submit.csv')
-        csv_fp = str(save_dir/'emoji_submit.csv')
-        map_fn2cid = dict(zip(fn_list, pred_list))
-        # print(map_fn2cid)
-        logger.info('Updaing _emoji df: '+ csv_fp )
-        for i in tqdm(df.index):
-            # print(i)
-            fn = df.iloc[i]['name']
-            cls_id =map_fn2cid[fn]
-            df.at[i, 'label'] = loader.dataset.classes[cls_id]
-        df.to_csv(csv_fp, encoding='utf-8', index=False)
-        logger.info('done! check: '+ csv_fp )
+        # df = pd.read_csv('../02read/sample_submit.csv')
+        # csv_fp = str(save_dir/'emoji_submit.csv')
+        # map_fn2cid = dict(zip(fn_list, pred_list))
+        # # print(map_fn2cid)
+        # logger.info('Updaing _emoji df: '+ csv_fp )
+        # for i in tqdm(df.index):
+        #     # print(i)
+        #     fn = df.iloc[i]['name']
+        #     cls_id =map_fn2cid[fn]
+        #     df.at[i, 'label'] = loader.dataset.classes[cls_id]
+        # df.to_csv(csv_fp, encoding='utf-8', index=False)
+        # logger.info('done! check: '+ csv_fp )
 
     return pred_list,val_acc,val_loss
 
@@ -373,9 +373,12 @@ parser.add_argument('--name', default='exp', help='save to project/name')
 parser.add_argument('--model', default='model_basic', help='set model when from scratch')
 parser.add_argument('--kfold', nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--skfold', nargs='?', const=True, default=False, help='resume most recent training')
-parser.add_argument('--seed', type=int, default='0', help='set seed for repro')
+parser.add_argument('--seed', type=int, default=0, help='set seed for repro')
 parser.add_argument('--split', type=float,   default='0.8', help='set seed for repro')
-parser.add_argument('--data', type=str, default='Rawset', help='set seed for repro')
+parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='[train, test] image sizes')
+parser.add_argument('--data', type=str, default='cifar10.yaml', help='data.yaml path')
+parser.add_argument('--task', type=str, default='all', help='set seed for repro') # test, all
+parser.add_argument('--inspect',action='store_true', help='set seed for repro') # test, all
 
 if isinteractive(): # not reliable, temp debug only  
     logger.info('[+]notebook \nNotebook mode ')
@@ -394,16 +397,22 @@ else:
 # opt.alt_paras = True  # only for freeze layers
 
 opt.model = 'basic'
-opt.epochs = 10
+opt.epochs = 3
 opt.batch = 32
 
-opt.dataset = 'Emoji'   # Emoji Covid
+
+# opt.data = '../21cov_ich.yaml' # try
+opt.data = 'Covid' # try
+opt.img_size = [640,640] # try
+# opt.dataset = 'Emoji'   # Emoji Covid
 opt.skfold = '1/5' 
-opt.repro = True  
+ 
 opt.nowandb = True
-opt.project = '28emoji_lo'
+opt.project = '21cov_lo'
 opt.workers = 8
-opt.seed = 0 
+opt.repro = True 
+# opt.seed = 0 
+# opt.inspect = True
 # opt.split = 0.8 # no-fold
 # opt.freeze = True # need opt.model 
 # opt.proxy = True
@@ -428,16 +437,18 @@ if opt.args:
                 logger.info('{}: {} > {}'.format(k,v,v_overide ))
 
 
-
-
 # transform
 train_mean, train_std = [0.5077, 0.5077, 0.5077], [0.2186, 0.2186, 0.2186]
 test_mean, test_std = [0.5060, 0.5060, 0.5060], [0.2191, 0.2191, 0.2191]
+
+
 transform_train = transforms.Compose(
-    [transforms.ToTensor(), 
+    [transforms.Resize(opt.img_size),
+    transforms.ToTensor(), 
         transforms.Normalize(train_mean,train_std)])
 transform_test = transforms.Compose(
-    [transforms.ToTensor(),
+    [transforms.Resize(opt.img_size),
+    transforms.ToTensor(),
         transforms.Normalize(test_mean, test_std)])
 
 
@@ -455,9 +466,9 @@ if opt.proxy:
 
 
 # Reproducibility,  NOT work in notebook!
+logger.info('\n[+]repro')
 seed = random.randint(0,9999)
 if opt.repro:
-    logger.info('\n[+]repro')
     seed = opt.seed
     os.environ['ICH_REPRO'] = '1'
     os.environ['ICH_SEED'] = str(seed)
@@ -480,6 +491,8 @@ else:
     torch.use_deterministic_algorithms(False) # for notenook!
     g = torch.Generator()
     g.manual_seed(seed)
+    logger.info('Disabled.')
+
  
 
 # resume
@@ -544,12 +557,21 @@ except Exception:
 logger.info('\n[+]dataset')
 # %% kfold 
 import datasets
+if opt.data.endswith('.yaml'):
+    rawset = datasets.LoadImageLabels(opt.data) # auto-build by yaml
+else:
+    rawset = getattr(datasets, opt.data)  # manual build  
 
-rawset =  getattr(datasets, opt.dataset)
-raw_train = rawset(root='./input', train=True,
-                    transform=transform_train)
-raw_test = rawset(root='./input', train=False,
-                    transform=transform_test)
+raw_train = rawset(
+    # root='./input', 
+    train=True,
+    transform=transform_train
+    )
+raw_test = rawset(
+    # root='./input', 
+    train=False,                    
+    transform=transform_test
+    )
 
 # from datasets import Emoji
 # raw_train = Emoji(root='./data', train=True,
@@ -593,7 +615,7 @@ testloader = torch.utils.data.DataLoader(raw_test, batch_size=batch_size,
                                         shuffle=False, num_workers=workers,
                                         worker_init_fn=seed_worker,
                                         generator=g)
-logger.info("Dataset loaded: " + opt.dataset)
+logger.info("Dataset loaded: " + opt.data)
 
 
 # model
@@ -720,9 +742,10 @@ writer.add_text('summary', summary_str, 0)
 writer.add_text('opt', str(opt.__dict__), 0)
 
 # visual model in bash 
-# input_shape = next(iter(trainloader))[0][0].shape
-# print("Input shape:",input_shape)
-# summary(model, input_shape)
+if opt.inspect:
+    input_shape = next(iter(trainloader))[0][0].shape
+    print("Input shape:",input_shape)
+    summary(model, input_shape)
 
 # Start Training >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 logger.info('\n[+]train')

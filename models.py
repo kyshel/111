@@ -27,7 +27,7 @@ if os.environ[repro_flag] == '1':
 # repro <<< end 
 
  
-
+# stale >>> 
 opti_paras = []
 
 def get2(model_name ='basic'):
@@ -36,23 +36,25 @@ def get2(model_name ='basic'):
     return globals()[model_name]()
 
  
-def basic():
-    return  nn.Sequential( # > 3 48 48
-                nn.Conv2d(3,6,5), # > 6 44 44
-                nn.ReLU(),
-                nn.MaxPool2d(2, 2), # 6 22 22
+# def basic():
+#     return  nn.Sequential( # > 3 48 48
+#                 nn.Conv2d(3,6,5), # > 6 44 44
+#                 nn.ReLU(),
+#                 nn.MaxPool2d(2, 2), # 6 22 22
 
-                nn.Conv2d(6,16,5), # 16 18 18
-                nn.ReLU(), 
-                nn.MaxPool2d(2, 2), # 16 9 9
+#                 nn.Conv2d(6,16,5), # 16 18 18
+#                 nn.ReLU(), 
+#                 nn.MaxPool2d(2, 2), # 16 9 9
 
-                nn.Flatten(), # 16*9*9 
+#                 nn.Flatten(), # 16*9*9 
+#                 # print(1111111111111),
 
-                nn.Linear(16*9*9, 256), 
-                nn.ReLU(),
+#                 # nn.Linear(16*9*9, 256), 
+#                 nn.Linear(394384, 256), 
+#                 nn.ReLU(),
 
-                nn.Linear(256, 7),
-    )
+#                 nn.Linear(256, 7),
+#     )
 
 
 
@@ -141,6 +143,19 @@ def vgg19_bn():
     m.classifier[6] = nn.Linear(4096,7)
     return m
 
+# stale <<<<<<<
+
+class PrintLayer(nn.Module):   
+    # https://discuss.pytorch.org/t/how-do-i-print-output-of-each-layer-in-sequential/5773/4
+
+    def __init__(self):
+        super(PrintLayer, self).__init__()
+    
+    def forward(self, x):
+        # Do your print / debug stuff here
+        print(x)
+        return x
+
 
  
 
@@ -171,8 +186,8 @@ def get(model_name, num_classes, feature_extract=False, use_pretrained=True):
                 nn.MaxPool2d(2, 2), # 16 9 9
 
                 nn.Flatten(), # 16*9*9 
-
-                nn.Linear(16*9*9, 256), 
+                nn.Linear(157*157*16, 256), 
+                # nn.Linear(16*9*9, 256), 
                 nn.ReLU(),
 
                 nn.Linear(256, num_classes),
