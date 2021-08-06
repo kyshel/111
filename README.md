@@ -16,7 +16,7 @@ pip install -r requirements.txt
 
 
 # p1
-- none 
+- add kfold  
 
 # p9
 - add cmds to logger

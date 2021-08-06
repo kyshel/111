@@ -1,5 +1,6 @@
 # %% preset
 
+from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
 from shutil import copyfile
 import random  
 from torchsummary import summary
@@ -90,17 +91,25 @@ def plot_cls_bar(cls_list, save_dir, dataset = None):
 
 def isinteractive():  # unreliable!
     # Warning! this may determine wrong
-
-    if 0 == 1: # remove error msg
-        get_ipython = 1 
+    # pylint: disable=E0602
+    # pylint: disable=undefined-variable
+    # pylint: disable=reportUndefinedVariable
+    
+    
+  
 
     try:
-        shell = get_ipython().__class__.__name__
+        # pylint: disable=E0602
+        # pylint: disable=undefined-variable
+        # pylint: disable=reportUndefinedVariable
+        # get_ipython = globals()["get_ipython"]()
+        get_ipython = vars(__builtins__)['get_ipython']
+        shell = get_ipython().__class__.__name__  
         if shell in ['ZMQInteractiveShell','TerminalInteractiveShell','Shell']:
             return True   # Jupyter notebook or qtconsole or colab 
         else:
             return True  # Other type (?)
-    except NameError:
+    except (NameError,KeyError) as e:
         return False      # Probably standard Python interpreter
 
 def stop(msg='Stop here!'):
@@ -351,7 +360,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--args', nargs='?', const=True, default=False,help='load args from file ')
 parser.add_argument('--weights', type=str, default='', help='initial weights path, override model')
 parser.add_argument('--repro', action='store_true', help='only save final checkpoint')
-parser.add_argument('--repro2', action='store_true', help='only save final checkpoint')
 parser.add_argument('--alt_paras', action='store_true', help='change optimizer parameters')
 parser.add_argument('--nopre', action='store_true', help='only save final checkpoint')
 parser.add_argument('--freeze', action='store_true', help='only save final checkpoint')
@@ -363,10 +371,16 @@ parser.add_argument('--resume', nargs='?', const=True, default=False, help='resu
 parser.add_argument('--proxy', nargs='?', const=True, default=False, help='proxy')
 parser.add_argument('--name', default='exp', help='save to project/name')
 parser.add_argument('--model', default='model_basic', help='set model when from scratch')
+parser.add_argument('--kfold', nargs='?', const=True, default=False, help='resume most recent training')
+parser.add_argument('--skfold', nargs='?', const=True, default=False, help='resume most recent training')
+
 if isinteractive(): # not reliable, temp debug only  
+    logger.info('[+]notebook ')
     opt = parser.parse_args(args=[]) 
 else:
+    logger.info('[+]bash ')
     opt = parser.parse_args()
+    
 
 
 ### opt explicit
@@ -376,8 +390,8 @@ else:
 # opt.model = 'vgg19_bn' basic googlenet efficientnet-b0
 
 # opt.alt_paras = True  # only for freeze layers
-
-opt.model = 'basic'
+opt.skfold = '1/5' # try
+opt.model = 'efficientnet-b0'
 opt.epochs = 3  
 opt.batch = 32
 
@@ -438,7 +452,7 @@ if opt.proxy:
 # Reproducibility,  NOT work in notebook!
 seed = random.randint(0,9999)
 if opt.repro:
-    logger.info('\n[+repro]')
+    logger.info('\n[+]repro')
     seed = 0
     os.environ['ICH_REPRO'] = '1'
     import models
@@ -452,7 +466,7 @@ if opt.repro:
     if isinteractive(): 
         logger.info(' U R in interative, torch.use_deterministic_algorithms set False !')
         torch.use_deterministic_algorithms(False)
-    logger.info('seed: {}, ICH_REPRO: {}'.format(seed,os.environ['ICH_REPRO']))
+    logger.info('Enabled, seed: {}, ICH_REPRO: {}'.format(seed,os.environ['ICH_REPRO']))
 else: 
     os.environ['ICH_REPRO'] = '0'
     import models
@@ -477,7 +491,6 @@ if opt.resume:
 
 
 # load opt, after resume 
-
 weights = opt.weights
 split_dot = opt.split  
 workers = opt.workers
@@ -505,9 +518,9 @@ with open(save_dir / 'opt.yaml', 'w') as f:
 msg = "\n[+]device \nICH 🚀 v0.1 Using device: {}".format(device) 
 #Additional Info when using cuda
 if device.type == 'cuda':
-    msg = msg + " + "
+    msg = msg + " ["
     msg = msg + torch.cuda.get_device_name(0)
-    msg +=  '\nGPU mem_allocated: {}GB, cached: {}GB'.format(
+    msg +=  ']\nGPU mem_allocated: {}GB, cached: {}GB'.format(
         round(torch.cuda.memory_allocated(0)/1024**3,1),
         round(torch.cuda.memory_reserved(0)/1024**3,1),
     ) 
@@ -524,11 +537,7 @@ except Exception:
 
 # dataset
 logger.info('\n[+]dataset')
-# transform = transforms.Compose(
-#     [transforms.ToTensor(),
-#         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-
-
+# %% kfold 
 
 
 raw_train = Emoji(root='./data', train=True,
@@ -537,10 +546,33 @@ raw_test = Emoji(root='./data', train=False,
                     transform=transform_test)
 classes = raw_train.classes
 nc = len(classes)
-num_train = int(len(raw_train) * split_dot)
-trainset, validset = \
-    random_split(raw_train, [num_train, len(raw_train) - num_train],
-                    generator=g)
+
+# num_train = int(len(raw_train) * split_dot)
+# trainset, validset = \
+#     random_split(raw_train, [num_train, len(raw_train) - num_train],
+#                     generator=g)
+
+  
+if opt.kfold or opt.skfold:  # fold, will ignore split_dot
+    fold_str = opt.kfold if opt.kfold else opt.skfold
+    nf, cf = int(fold_str.split('/')[1]),int(fold_str.split('/')[0]) # num-fold,current-fold
+    if opt.kfold:
+        logger.info('KFold @'+ fold_str)
+        fold_obj = KFold(n_splits=nf, random_state=seed, shuffle=True)
+    elif opt.skfold:
+        logger.info('StratifiedKFold @' + fold_str)
+        fold_obj = StratifiedKFold(n_splits=nf, random_state=seed, shuffle=True)
+
+    for i_fold, ids in enumerate(fold_obj.split(raw_train,raw_train.targets)):
+        if (i_fold + 1) == cf:
+            trainset = torch.utils.data.Subset(raw_train,ids[0])
+            validset = torch.utils.data.Subset(raw_train,ids[1])
+            break
+else: # nofold, use split_dot
+    num_train = int(len(raw_train) * split_dot)
+    trainset, validset = random_split(raw_train,
+                                    [num_train, len(raw_train) - num_train],                                    
+                                    generator=g)
 
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
                                             shuffle=True, num_workers=workers,
@@ -658,9 +690,18 @@ plot_cls_bar(raw_train.targets, save_dir, raw_train)
 
 # visual info 
 logger.info("\n[+]info")
-summary_str = "datasets: split_dot:{}, raw_train:raw_test={}/{} \
+
+dataset_msg = 'No msg'
+if opt.kfold:
+    dataset_msg = "Kfold @" + opt.kfold
+elif opt.skfold:
+    dataset_msg = "StratifiedKFold @" + opt.skfold
+else:
+    dataset_msg = "Split_dot: @" + split_dot
+summary_str = "- dataset: {}".format(dataset_msg)
+summary_str += "  raw_train:raw_test={}/{} \
     \ntrainset:validset={}/{}  \nclasses_count: {}, batch_size:{}".format(
-    split_dot,len(raw_train),len(raw_test),len(trainset),len(validset),len(classes),batch_size
+     len(raw_train),len(raw_test),len(trainset),len(validset),len(classes),batch_size
 )
 # logger.info(model)
 logger.info(summary_str)
