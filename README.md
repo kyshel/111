@@ -16,7 +16,7 @@ pip install -r requirements.txt
 
 
 # p1
-- add kfold  
+- none
 
 # p9
 - add cmds to logger
@@ -26,10 +26,11 @@ pip install -r requirements.txt
 - repro not work in notebook
 - isinteractive not reliable
 - add repro2 for vgg 
-
+- add dataset support 
 
 
 # logs
+- v16 add kfold and skolf  
 - v15 save .pt with optimzer not striped
 - v14 add model selection
 - v13 logger to local file ok 

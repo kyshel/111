@@ -10,12 +10,12 @@ import numpy as np
  
 # repro 
 repro_flag = "ICH_REPRO"
-
+repro_seed = "ICH_SEED"
 if repro_flag not in os.environ:
     raise Exception('Please set repro flag: '+repro_flag)
 
+seed = int(os.environ[repro_seed])
 if os.environ[repro_flag] == '1':
-    seed = 0
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -24,7 +24,10 @@ if os.environ[repro_flag] == '1':
     g = torch.Generator()
     g.manual_seed(seed)
 
+
+
  
+
 opti_paras = []
 
 def get2(model_name ='basic'):

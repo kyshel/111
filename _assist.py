@@ -1,14 +1,10 @@
 # snippets that assist devleop
 
 
-
-
-
-
-
+# %%
+# %%
+# %%
 # %% 
-
-
 
 
 
@@ -52,3 +48,17 @@ print(mean,std)
 
 
 # %%
+
+
+
+import numpy as np
+
+
+np.random.RandomState(0)
+
+
+
+
+
+
+

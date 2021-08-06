@@ -360,7 +360,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--args', nargs='?', const=True, default=False,help='load args from file ')
 parser.add_argument('--weights', type=str, default='', help='initial weights path, override model')
 parser.add_argument('--repro', action='store_true', help='only save final checkpoint')
-parser.add_argument('--alt_paras', action='store_true', help='change optimizer parameters')
+# parser.add_argument('--alt_paras', action='store_true', help='change optimizer parameters')
 parser.add_argument('--nopre', action='store_true', help='only save final checkpoint')
 parser.add_argument('--freeze', action='store_true', help='only save final checkpoint')
 parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
@@ -373,6 +373,8 @@ parser.add_argument('--name', default='exp', help='save to project/name')
 parser.add_argument('--model', default='model_basic', help='set model when from scratch')
 parser.add_argument('--kfold', nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--skfold', nargs='?', const=True, default=False, help='resume most recent training')
+parser.add_argument('--seed', type=int, default='0', help='set seed for repro')
+parser.add_argument('--split', type=float,   default='0.8', help='set seed for repro')
 
 if isinteractive(): # not reliable, temp debug only  
     logger.info('[+]notebook ')
@@ -388,18 +390,19 @@ else:
 # opt.model = 'res152_pre'
 # opt.model = 'vgg11'
 # opt.model = 'vgg19_bn' basic googlenet efficientnet-b0
-
 # opt.alt_paras = True  # only for freeze layers
-opt.skfold = '1/5' # try
-opt.model = 'efficientnet-b0'
-opt.epochs = 3  
+
+opt.model = 'basic'
+opt.epochs = 10  
 opt.batch = 32
 
-opt.split = 0.8
+opt.skfold = '1/5' # try
 opt.repro = True  
 opt.nowandb = True
 opt.project = '28emoji'
-opt.workers = 8 
+opt.workers = 8
+opt.seed = 42 
+# opt.split = 0.8 # no-fold
 # opt.freeze = True # need opt.model 
 # opt.proxy = True
 # opt.weights = '28emoji/exp21/weights/best.pt'
@@ -453,9 +456,10 @@ if opt.proxy:
 seed = random.randint(0,9999)
 if opt.repro:
     logger.info('\n[+]repro')
-    seed = 0
+    seed = opt.seed
     os.environ['ICH_REPRO'] = '1'
-    import models
+    os.environ['ICH_SEED'] = str(seed)
+    import models  # must after os.emviron is defined
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -466,10 +470,11 @@ if opt.repro:
     if isinteractive(): 
         logger.info(' U R in interative, torch.use_deterministic_algorithms set False !')
         torch.use_deterministic_algorithms(False)
-    logger.info('Enabled, seed: {}, ICH_REPRO: {}'.format(seed,os.environ['ICH_REPRO']))
+    logger.info('Enabled, seed: {}, ICH_REPRO: {}'.format(os.environ['ICH_SEED'],os.environ['ICH_REPRO']))
 else: 
     os.environ['ICH_REPRO'] = '0'
-    import models
+    os.environ['ICH_SEED'] = str(seed)
+    import models # must after os.emviron is defined
     torch.use_deterministic_algorithms(False) # for notenook!
     g = torch.Generator()
     g.manual_seed(seed)
@@ -492,7 +497,7 @@ if opt.resume:
 
 # load opt, after resume 
 weights = opt.weights
-split_dot = opt.split  
+split_dot = opt.split   
 workers = opt.workers
 batch_size = opt.batch
 epochs = opt.epochs
@@ -608,7 +613,8 @@ logger.info("Loaded modle: "+ model_name)
 
 # hyp 
 criterion = nn.CrossEntropyLoss()
-opti_paras = models.opti_paras[model_name] if opt.alt_paras else model.parameters()
+# opti_paras = models.opti_paras[model_name] if opt.alt_paras else model.parameters()
+opti_paras = model.fc.parameters() if opt.freeze else model.parameters()
 optimizer = optim.SGD(opti_paras, lr=0.001, momentum=0.9)
 start_epoch, best_acc = 0, 0.0
 if pretrained:
