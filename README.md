@@ -26,7 +26,7 @@ pip install -r requirements.txt
 - repro not work in notebook
 - isinteractive not reliable
 - add repro2 for vgg 
-- add dataset support 
+- add custom dataset 
 
 
 # logs
