@@ -296,42 +296,35 @@ else:
     logger.info('[+]bash \nBash mode')
     opt = parser.parse_args()
     
-
-
 ### opt explicit
 
-# opt.model = 'res152_pre'
-# opt.model = 'vgg11'
-# opt.model = 'vgg19_bn' basic googlenet efficientnet-b0   res18
-# opt.alt_paras = True  # only for freeze layers
 
-opt.model = 'basic'
-opt.epochs = 3
+# basic  res18 vgg11 efb0 efficientnet-b7   alexnet squeezenet1_0 densenet121                     
+opt.model = 'efb0' 
+opt.epochs = 60
 opt.batch = 32
 
 
-# opt.data = '../21cov_ich.yaml' # try
-opt.data = 'Covid' # try
+
+opt.data = 'Covid' # try Emoji Covid  '21cov_ich.yaml'
 opt.img_size = [64,64] # try
-# opt.dataset = 'Emoji'   # Emoji Covid
 opt.skfold = '1/5' 
- 
 opt.nowandb = True
 opt.project = '21cov_lo'
 opt.workers = 8
 opt.repro = True 
-opt.cache = 'pkl/t6.pkl' # try 
+opt.cache = 'pkl/t6.pkl'  
 # opt.inspect = True
 # opt.seed = 1 
 # opt.split = 0.8 # no-fold
-# opt.freeze = True # need opt.model 
+opt.freeze = True # need opt.model 
 # opt.proxy = True
 # opt.weights = '28emoji/exp21/weights/best.pt'
 # opt.resume = '28emoji/exp38/weights/last.pt'
 # opt.args = 'args.yaml'
 # opt.notest = True
-# opt.nosave = True
-# opt.notest = True
+opt.nosave = True
+
 
 
 
@@ -469,25 +462,27 @@ except Exception:
 # dataset
 logger.info('\n[+]dataset')
 import datasets
-
+# cache
 fp_cache = str(opt.cache)
 if str(fp_cache).endswith('.pkl') and os.path.isfile(fp_cache): 
     # use cache
-    logger.info('Loding dataset from cache ... (Memory may be full)')
+    mb = os.path.getsize(fp_cache) / 1E6  # filesize
+    logger.info(f'Loading cache from {fp_cache} ({mb:.1f}MB)'  ) 
     try:
-        raw_train, raw_test, cached_opt = ax.load_obj(fp_cache)
-        checklist = ['img_size',]
-        for arg in checklist:
-            want_arg = getattr(opt,arg)
-            cached_arg = getattr(cached_opt,arg)
-            assert want_arg == cached_arg , \
-                "{} not equal, want:{}, cached:{}, try without --cache".format(
-                    arg,
-                    want_arg,
-                    cached_arg,
-                ) 
+        raw_train, raw_test, cached_opt = ax.load_obj(fp_cache,silent=1)
     except Exception as e:
-        raise Exception(e + "\nError occured, try without --cache")
+        raise Exception(str(e) + "\nError occured, try without --cache")
+    # check 
+    checklist = ['img_size','data']
+    for arg in checklist:
+        want_arg = getattr(opt,arg)
+        cached_arg = getattr(cached_opt,arg)
+        assert want_arg == cached_arg , \
+            "{} not equal, want:{}, cached:{}, change cache-name or remove --cache".format(
+                arg,
+                want_arg,
+                cached_arg,
+            ) 
 else: 
     # create cache
     if opt.data.endswith('.yaml'):
@@ -557,7 +552,7 @@ testloader = torch.utils.data.DataLoader(raw_test, batch_size=batch_size,
                                         shuffle=False, num_workers=workers,
                                         worker_init_fn=seed_worker,
                                         generator=g)
-logger.info("Dataset loaded: " + opt.data)
+logger.info("Loaded dataset: " + opt.data)
 
 
 
@@ -576,7 +571,7 @@ else:
     model_name = opt.model
     model = models.get(model_name,nc,opt.freeze,opt.nopre)
 model.to(device)
-logger.info("Loaded modle: "+ model_name)
+logger.info("Loaded model: "+ model_name)
 
 # hyp 
 criterion = nn.CrossEntropyLoss()
@@ -588,7 +583,7 @@ if opt.freeze:
     for name,param in model.named_parameters():
         if param.requires_grad == True:
             params_to_update.append(param)
-            logger.info("\t",name)
+            logger.info("\t" + name)
 else:
     for name,param in model.named_parameters():
         if param.requires_grad == True:
@@ -698,9 +693,8 @@ logger.info('Starting training for {} epochs...'.format(epochs))
 best_model_wts = copy.deepcopy(model.state_dict())
 since = time.time()
 for epoch in range(start_epoch,epochs):
-    logging.info("")
+    logger.info("")
     final_epoch = epoch + 1 == epochs
-
     model.train()  # Set model to training mode
     running_loss = 0.0
     running_corrects = 0
@@ -795,7 +789,7 @@ for epoch in range(start_epoch,epochs):
 
 # summary  
 time_elapsed = time.time() - since
-msg_sum = '{} epochs completed in {:.0f}m {:.0f}s \n\n'.format(
+msg_sum = '\n{} epochs completed in {:.0f}m {:.0f}s \n\n'.format(
     epochs - start_epoch , time_elapsed // 60, time_elapsed % 60) # epoch should + 1?
 msg_sum += 'Best val Acc: {:4f}'.format(best_acc)
 logger.info(msg_sum) 

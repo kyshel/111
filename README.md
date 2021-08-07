@@ -30,7 +30,7 @@ pip install -r requirements.txt
 - fit custom dataset to official dataset 
 - add cache 
 - refactor: rename funcs, like pix,cid,fn
-
+- pretty progress bar 4row to 2row
 
 # logs
 - v16 add kfold and skolf  

@@ -205,6 +205,8 @@ def get(model_name, num_classes, feature_extract=False, use_pretrained=True):
     model_ft = None
     if feature_extract:
         print("Freeze enbled!")
+    
+    model_name = 'efficientnet-b0' if model_name in ['efb0'] else model_name
 
     if model_name == "basic":
         before_liner = 2704
@@ -346,7 +348,7 @@ def get(model_name, num_classes, feature_extract=False, use_pretrained=True):
     #     model_ft = 
 
     else:
-        print(model_name,"model Invalid, check models.py, exiting...")
+        print(f'>{model_name}<  model Invalid, check models.py, exiting...'  )
         exit()
 
     return model_ft
