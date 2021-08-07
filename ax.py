@@ -31,8 +31,8 @@ def nowtime(style = 0):
     fmt = "%Y-%m-%d %H:%M:%S" 
   return strftime(fmt, localtime())
 
-def mkdir(dir_name):
-  Path(dir_name).mkdir(parents=True, exist_ok=True)
+def mkdir(fp):
+  Path(fp).mkdir(parents=True, exist_ok=True)
 
 
 def get_fp_list(dir_name,ext = None):
@@ -94,10 +94,10 @@ def ins(v):
     print("ins<<<")
 
 
-def save_obj(obj1, filename='tmp_obj.txt',silent = 0):
-    with open(filename, 'wb') as handle:
+def save_obj(obj1, fp='tmp_obj.txt',silent = 0):
+    with open(fp, 'wb') as handle:
         pickle.dump(obj1, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    if not silent: print('save_obj ok! please check ' + filename)
+    if not silent: print('save_obj ok! please check ' + fp)
     pass
 
 

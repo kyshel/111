@@ -8,6 +8,8 @@ from torchvision import models
 import os 
 import numpy as np
  
+env_inspect = "ECH_INSPECT"
+
 # repro >>> start
 repro_flag = "ICH_REPRO"
 repro_seed = "ICH_SEED"
@@ -145,26 +147,56 @@ def vgg19_bn():
 
 # stale <<<<<<<
 
+class Net(nn.Module):  
+    #  not runnable, rm
+    def __init__(self,nc):
+        super().__init__()
+
+        self.nc = nc
+        self.linear_input_size = 16*9*9
+
+        self.conv_net = nn.Sequential(
+            nn.Conv2d(3,6,5), # > 6 44 44
+            nn.ReLU(),
+            nn.MaxPool2d(2, 2), # 6 22 22
+
+            nn.Conv2d(6,16,5), # 16 18 18
+            nn.ReLU(), 
+            nn.MaxPool2d(2, 2), # 16 9 9
+
+            nn.Flatten(), # 16*9*9 
+        )
+
+        self.fc =  nn.Sequential(
+            nn.Linear(16, 256),
+            nn.ReLU(),
+            nn.Linear(256, self.nc),
+        )
+    def forward(self, x):
+        x = self.conv_net(x)
+        # print(x.size())
+        x = self.fc(x)
+        return x
+ 
+
+
+
 class PrintLayer(nn.Module):   
     # https://discuss.pytorch.org/t/how-do-i-print-output-of-each-layer-in-sequential/5773/4
-
     def __init__(self):
         super(PrintLayer, self).__init__()
     
     def forward(self, x):
         # Do your print / debug stuff here
-        print(x)
+        if os.environ[env_inspect] == '1':
+            print(">>>Before linear:",x.size())
         return x
-
-
- 
 
 
 def set_parameter_requires_grad(model, feature_extracting):
     if feature_extracting:
         for param in model.parameters():
             param.requires_grad = False
-
 
 
 def get(model_name, num_classes, feature_extract=False, use_pretrained=True):
@@ -174,19 +206,21 @@ def get(model_name, num_classes, feature_extract=False, use_pretrained=True):
     if feature_extract:
         print("Freeze enbled!")
 
-
     if model_name == "basic":
+        before_liner = 2704
         model_ft = nn.Sequential( # > 3 48 48
                 nn.Conv2d(3,6,5), # > 6 44 44
                 nn.ReLU(),
                 nn.MaxPool2d(2, 2), # 6 22 22
-
                 nn.Conv2d(6,16,5), # 16 18 18
+
                 nn.ReLU(), 
                 nn.MaxPool2d(2, 2), # 16 9 9
-
                 nn.Flatten(), # 16*9*9 
-                nn.Linear(157*157*16, 256), 
+
+                PrintLayer(),
+                nn.Linear(before_liner, 256), # 320
+                # nn.Linear(157*157*16, 256), # 640
                 # nn.Linear(16*9*9, 256), 
                 nn.ReLU(),
 

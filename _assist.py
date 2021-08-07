@@ -1,11 +1,33 @@
 # snippets that assist devleop
-
+# type: ignore
 
 # %%
 # %%
 # %%
 # %% 
 
+
+
+
+a = [1,2]
+b,c = a
+print(b,c)
+
+
+
+
+exit()
+
+import ax
+from pathlib import Path
+
+a = 123
+fp  = '_rm6666/_rm5555555/_rm2222.txt'
+
+
+ax.mkdir(Path(fp).parent)
+
+exit()
 
 
 

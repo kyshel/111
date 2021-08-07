@@ -14,6 +14,12 @@ import ax
 from PIL import Image
 from torch.utils.data import Dataset
 import pandas as pd
+from multiprocessing.pool import ThreadPool
+from itertools import repeat
+from tqdm import tqdm 
+import sys
+from pathlib import Path
+
 
 # repro >>> start
 repro_flag = "ICH_REPRO"
@@ -148,29 +154,48 @@ class Covid(Dataset):
     classes = cats
 
     def __init__(self, 
-                 root =  '../03png/train' ,
-                 csv = '../00raw/train_study_level.csv',
-                 obj = '../11data/train_imginfo.obj',
-                 train=True, transform=None, ):
+                 root,  # '../03png/train'
+                 obj,   #  '../11data/train_imginfo.obj'
+                 csv = '../00raw/train_study_level.csv', 
+                 train=True, transform=None,cache_images=None,workers=2,prefix='' ):
         """
         Args:
             root
         """
+
         self.csv = csv
         self.obj = obj
         self.root = root     
         self.transform = transform
         self.train = train   # trainset or testset
+        self.cache_images = cache_images
         self.pid2cid = self.get_pid2cid()   
 
+        
         targets = []
         filenames = []
         for pid,cid in self.pid2cid:
             targets+= [cid]
             filenames += [pid]
-
         self.targets = targets
         self.filenames = filenames
+
+        n = len(self.pid2cid)
+        self.pixs = [None] * n
+        self.cids = [None] * n
+        self.pids = [None] * n
+
+        if self.cache_images:
+            gb=0
+            ids = range(n)
+            results = ThreadPool(workers).imap(self.load_img,  ids  )  # 8 threads
+            pbar = tqdm(enumerate(results), total=n, mininterval=1,)
+            for i, x in pbar:
+                self.pixs[i],self.cids[i],self.pids[i] = x  # img, hw_original, hw_resized = load_image(self, i)
+                # gb += self.pixs[i].nbytes # sys.getsizeof(b.storage())
+                gb +=  sys.getsizeof(self.pixs[i].storage())
+                pbar.desc = f'{prefix}Caching images ({gb / 1E9:.1f}GB)'
+            pbar.close()
 
 
         
@@ -179,10 +204,17 @@ class Covid(Dataset):
         return len(self.pid2cid)
 
     def __getitem__(self, idx):
+        if self.cache_images:
+            i = idx
+            return self.pixs[i],self.cids[i],self.pids[i]
+        else:
+            return self.load_img(idx) # pix,cid,pid
+             
+
+    def load_img(self,idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
         
-
         cid = self.pid2cid[idx][1] 
         pid = self.pid2cid[idx][0]
 
@@ -194,7 +226,7 @@ class Covid(Dataset):
 
         if self.transform:
             pix = self.transform(pix)
- 
+
         return pix,cid,pid
 
     def get_pid2cid(self): # [['pic1',1],['pic2',2]]

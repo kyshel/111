@@ -259,99 +259,9 @@ def inverse_normalize(tensor, mean =(0.5,0.5,0.5),std=(0.5,0.5,0.5)):
     tensor.mul_(std).add_(mean)
     return tensor
 
-# %% dataset   
-class Emoji2(VisionDataset):
-    pkl_fp = '../03save.pkl'
-    classes = ('angry', 'disgusted', 'fearful',
-            'happy', 'neutral', 'sad', 'surprised')
-    cls_names = classes
-
-
-    def __init__(
-            self,
-            root: str,
-            train: bool = True,
-            transform: Optional[Callable] = None,
-            target_transform: Optional[Callable] = None,
-    ) -> None:
-
-        super(Emoji2, self).__init__(root, transform=transform,
-                                    target_transform=target_transform)
-
-        self.train = train  # training set or test set
-
-        self.data: Any = []
-        self.targets = []
-
-        # now load the pkl
-        pkl_fp =  self.pkl_fp
-        pkl_data = ax.load_obj(pkl_fp,silent=1)
-        loaded_data = pkl_data['train_data'] if train else pkl_data['test_data']
-
-        img_list, fn_list, label_id_list = [], [], []
-        if self.train:
-            for img_np, fn, labe_id in loaded_data:
-                img_list += [img_np]
-                fn_list += [fn]
-                label_id_list += [labe_id]
-
-        else:
-            for img_np, fn in loaded_data:
-                img_list += [img_np]
-                fn_list += [fn]
-                label_id_list += [0]
-
-        img_np_list = np.asarray(img_list)  # convert to np
-        img_np_list2 = np.repeat(
-            img_np_list[:, :, :, np.newaxis], 3, axis=3)  # expand 1 channel to 3 channel 
-
-        # print( img_np_list.shape)
-        # print( 'img_np_list2 shape',img_np_list2.shape)
-
-        
-        # slice = 100
-        # self.data = img_np_list2[:slice]
-        # self.filenames = fn_list[:slice]
-        # self.targets = label_id_list[:slice]
-
-        self.data = img_np_list2
-        self.filenames = fn_list
-        self.targets = label_id_list
-
-
-    def __len__(self) -> int:
-        return len(self.data)
-
-    def extra_repr(self) -> str:
-        return "Split: {}".format("Train" if self.train is True else "Test")
-
-    def get_filenames(self) -> list:
-        return self.filenames
-
-    def __getitem__(self, index: int) -> Tuple[Any, Any, Any]:
-        img, target, fn = self.data[index], self.targets[index], self.filenames[index]
-
-        # doing this so that it is consistent with all other datasets
-        # to return a PIL Image
-        img = Image.fromarray(img)
-
-        if self.transform is not None:
-            img = self.transform(img)
-
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-
-        return img, target, fn
-
-
- 
-
- 
 
  
 # infer(validloader,model,classes,3)
-
-
 
 
 # %% set opt
@@ -360,13 +270,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--args', nargs='?', const=True, default=False,help='load args from file ')
 parser.add_argument('--weights', type=str, default='', help='initial weights path, override model')
 parser.add_argument('--repro', action='store_true', help='only save final checkpoint')
-# parser.add_argument('--alt_paras', action='store_true', help='change optimizer parameters')
 parser.add_argument('--nopre', action='store_true', help='only save final checkpoint')
 parser.add_argument('--freeze', action='store_true', help='only save final checkpoint')
 parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
 parser.add_argument('--notest', action='store_true', help='only test final epoch')
 parser.add_argument('--nowandb', action='store_true', help='disable wandb')
-parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
 parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--proxy', nargs='?', const=True, default=False, help='proxy')
 parser.add_argument('--name', default='exp', help='save to project/name')
@@ -378,7 +286,8 @@ parser.add_argument('--split', type=float,   default='0.8', help='set seed for r
 parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='[train, test] image sizes')
 parser.add_argument('--data', type=str, default='cifar10.yaml', help='data.yaml path')
 parser.add_argument('--task', type=str, default='all', help='set seed for repro') # test, all
-parser.add_argument('--inspect',action='store_true', help='set seed for repro') # test, all
+parser.add_argument('--inspect',action='store_true', help='inspect model details') # test, all
+parser.add_argument('--cache',nargs='?', const=True, default=False, help='resume most recent training')
 
 if isinteractive(): # not reliable, temp debug only  
     logger.info('[+]notebook \nNotebook mode ')
@@ -403,7 +312,7 @@ opt.batch = 32
 
 # opt.data = '../21cov_ich.yaml' # try
 opt.data = 'Covid' # try
-opt.img_size = [640,640] # try
+opt.img_size = [64,64] # try
 # opt.dataset = 'Emoji'   # Emoji Covid
 opt.skfold = '1/5' 
  
@@ -411,8 +320,9 @@ opt.nowandb = True
 opt.project = '21cov_lo'
 opt.workers = 8
 opt.repro = True 
-# opt.seed = 0 
+opt.cache = 'pkl/t6.pkl' # try 
 # opt.inspect = True
+# opt.seed = 1 
 # opt.split = 0.8 # no-fold
 # opt.freeze = True # need opt.model 
 # opt.proxy = True
@@ -429,7 +339,7 @@ opt.repro = True
 if opt.args:
     with open(opt.args) as f:
         args = argparse.Namespace(**yaml.safe_load(f))  # replace
-        logger.info('\n[+]args \nOverding args:')
+        logger.info('\n[+]args \nWarning! Overding args from '+ opt.args)
         for k,v in opt.__dict__.items(): # ensure no new args
             if hasattr(args, k):
                 v_overide =  getattr(args, k)  
@@ -440,8 +350,6 @@ if opt.args:
 # transform
 train_mean, train_std = [0.5077, 0.5077, 0.5077], [0.2186, 0.2186, 0.2186]
 test_mean, test_std = [0.5060, 0.5060, 0.5060], [0.2191, 0.2191, 0.2191]
-
-
 transform_train = transforms.Compose(
     [transforms.Resize(opt.img_size),
     transforms.ToTensor(), 
@@ -463,6 +371,11 @@ if opt.proxy:
     print("\n[+]proxy \nProxy has been set to "+ proxy_url)
     os.environ['http_proxy'] = proxy_url
     os.environ['https_proxy'] = proxy_url
+# env
+if opt.inspect:
+    os.environ['ECH_INSPECT'] = '1'
+else:
+    os.environ['ECH_INSPECT'] = '0'
 
 
 # Reproducibility,  NOT work in notebook!
@@ -552,34 +465,63 @@ except Exception:
 
 
 
-
+#%% dataset 
 # dataset
 logger.info('\n[+]dataset')
-# %% kfold 
 import datasets
-if opt.data.endswith('.yaml'):
-    rawset = datasets.LoadImageLabels(opt.data) # auto-build by yaml
-else:
-    rawset = getattr(datasets, opt.data)  # manual build  
 
-raw_train = rawset(
-    # root='./input', 
-    train=True,
-    transform=transform_train
-    )
-raw_test = rawset(
-    # root='./input', 
-    train=False,                    
-    transform=transform_test
-    )
+fp_cache = str(opt.cache)
+if str(fp_cache).endswith('.pkl') and os.path.isfile(fp_cache): 
+    # use cache
+    logger.info('Loding dataset from cache ... (Memory may be full)')
+    try:
+        raw_train, raw_test, cached_opt = ax.load_obj(fp_cache)
+        checklist = ['img_size',]
+        for arg in checklist:
+            want_arg = getattr(opt,arg)
+            cached_arg = getattr(cached_opt,arg)
+            assert want_arg == cached_arg , \
+                "{} not equal, want:{}, cached:{}, try without --cache".format(
+                    arg,
+                    want_arg,
+                    cached_arg,
+                ) 
+    except Exception as e:
+        raise Exception(e + "\nError occured, try without --cache")
+else: 
+    # create cache
+    if opt.data.endswith('.yaml'):
+        rawset = datasets.LoadImageLabels(opt.data) # auto-build by yaml
+    else:
+        rawset = getattr(datasets, opt.data)  # manual build  
 
-# from datasets import Emoji
-# raw_train = Emoji(root='./data', train=True,
-#                     transform=transform_train)
-# raw_test = Emoji(root='./data', train=False,
-#                     transform=transform_test)
+    # load dataset
+    raw_train = rawset(
+        root='../03png/train', 
+        obj = '../11data/train_imginfo.obj',
+        train=True,
+        transform=transform_train,
+        cache_images = opt.cache,
+        # prefix = 'raw_train:',
+        workers = opt.workers,
+        )
+    raw_test = rawset(
+        root='../03png/test', 
+        obj = '../11data/test_imginfo.obj',
+        train=False,                    
+        transform=transform_test,
+        cache_images = opt.cache,
+        # prefix = 'raw_test:',
+        workers = opt.workers,
+        )
 
+    # save cache
+    if str(fp_cache).endswith('.pkl'):
+        logger.info("Caching dataset to "+ fp_cache)
+        ax.mkdir(Path(fp_cache).parent)
+        ax.save_obj([raw_train,raw_test,opt],fp_cache)  
 
+# fold
 classes = raw_train.classes
 nc = len(classes)
 if opt.kfold or opt.skfold:  # fold, will ignore split_dot
@@ -616,6 +558,8 @@ testloader = torch.utils.data.DataLoader(raw_test, batch_size=batch_size,
                                         worker_init_fn=seed_worker,
                                         generator=g)
 logger.info("Dataset loaded: " + opt.data)
+
+
 
 
 # model
@@ -733,8 +677,8 @@ elif opt.skfold:
 else:
     dataset_msg = "Split_dot: " + str(split_dot)
 summary_str = "- dataset: {}".format(dataset_msg)
-summary_str += "  raw_train:{},raw_test:{}, trainset:{}, validset:{}, nc:{}, batch:{}".format(
-     len(raw_train),len(raw_test),len(trainset),len(validset),len(classes),batch_size
+summary_str += "  raw_train:{},raw_test:{}, trainset:{}, validset:{}, nc:{}, batch:{},  ".format(
+     len(raw_train),len(raw_test),len(trainset),len(validset),len(classes),batch_size,  
 )
 # logger.info(model)
 logger.info(summary_str)

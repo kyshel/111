@@ -29,6 +29,7 @@ pip install -r requirements.txt
 - add custom dataset
 - fit custom dataset to official dataset 
 - add cache 
+- refactor: rename funcs, like pix,cid,fn
 
 
 # logs
