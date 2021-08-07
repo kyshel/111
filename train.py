@@ -267,6 +267,7 @@ def inverse_normalize(tensor, mean =(0.5,0.5,0.5),std=(0.5,0.5,0.5)):
 # %% set opt
 # if __name__ == '__main__':
 parser = argparse.ArgumentParser()
+parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
 parser.add_argument('--args', nargs='?', const=True, default=False,help='load args from file ')
 parser.add_argument('--weights', type=str, default='', help='initial weights path, override model')
 parser.add_argument('--repro', action='store_true', help='only save final checkpoint')
@@ -307,14 +308,14 @@ opt.batch = 32
 
 
 opt.data = 'Covid' # try Emoji Covid  '21cov_ich.yaml'
-opt.img_size = [64,64] # try
+opt.img_size = [340,340] # try
 opt.skfold = '1/5' 
 opt.nowandb = True
 opt.project = '21cov_lo'
 opt.workers = 8
 opt.repro = True 
-opt.cache = 'pkl/t6.pkl'  
-# opt.inspect = True
+opt.cache = 'pkl/t7_340.pkl'  
+opt.inspect = True
 # opt.seed = 1 
 # opt.split = 0.8 # no-fold
 opt.freeze = True # need opt.model 
@@ -323,7 +324,7 @@ opt.freeze = True # need opt.model
 # opt.resume = '28emoji/exp38/weights/last.pt'
 # opt.args = 'args.yaml'
 # opt.notest = True
-opt.nosave = True
+# opt.nosave = True
 
 
 
@@ -340,9 +341,9 @@ if opt.args:
                 logger.info('{}: {} > {}'.format(k,v,v_overide ))
 
 
-# transform
-train_mean, train_std = [0.5077, 0.5077, 0.5077], [0.2186, 0.2186, 0.2186]
-test_mean, test_std = [0.5060, 0.5060, 0.5060], [0.2191, 0.2191, 0.2191]
+# transform Covid
+train_mean, train_std = [0.5234, 0.5234, 0.5234], [0.2165, 0.2165, 0.2165]
+test_mean, test_std = [0.5213, 0.5213, 0.5213], [0.2199, 0.2199, 0.2199]
 transform_train = transforms.Compose(
     [transforms.Resize(opt.img_size),
     transforms.ToTensor(), 
@@ -466,8 +467,8 @@ import datasets
 fp_cache = str(opt.cache)
 if str(fp_cache).endswith('.pkl') and os.path.isfile(fp_cache): 
     # use cache
-    mb = os.path.getsize(fp_cache) / 1E6  # filesize
-    logger.info(f'Loading cache from {fp_cache} ({mb:.1f}MB)'  ) 
+    gb = os.path.getsize(fp_cache) / 1E9  # filesize
+    logger.info(f'Loading cache from {fp_cache} ({gb:.3f}GB)'  ) 
     try:
         raw_train, raw_test, cached_opt = ax.load_obj(fp_cache,silent=1)
     except Exception as e:
@@ -497,7 +498,7 @@ else:
         train=True,
         transform=transform_train,
         cache_images = opt.cache,
-        # prefix = 'raw_train:',
+        prefix = 'raw_train:',
         workers = opt.workers,
         )
     raw_test = rawset(
@@ -506,7 +507,7 @@ else:
         train=False,                    
         transform=transform_test,
         cache_images = opt.cache,
-        # prefix = 'raw_test:',
+        prefix = 'raw_test:',
         workers = opt.workers,
         )
 
