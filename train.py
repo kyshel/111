@@ -53,6 +53,7 @@ logging.basicConfig(
         ]
     )
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.FileHandler('_logger.txt')) 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
