@@ -630,9 +630,10 @@ optimizer = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
 start_epoch, best_acc = 0, 0.0
 if pretrained:
     # Optimizer
-    if ckpt['optimizer_state_dict'] is not None:
-        optimizer.load_state_dict(ckpt['optimizer_state_dict'])
-        best_acc = ckpt['best_acc']
+    if ckpt['optimizer_state_dict'] is not None: # origin should be resume, but not now
+        if opt.resume: # this is final-not-strip's side-affect 
+            optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+            best_acc = ckpt['best_acc']
     # Results
     if ckpt.get('training_results') is not None:
         results_file.write_text(ckpt['training_results'])  # write results.txt
