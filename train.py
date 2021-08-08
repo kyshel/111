@@ -44,6 +44,9 @@ from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
 
 # logger 
+for handler in logging.root.handlers[:]:  
+    # https://stackoverflow.com/questions/12158048/changing-loggings-basicconfig-which-is-already-set
+    logging.root.removeHandler(handler)
 logging.basicConfig(
         format="%(message)s",
         level=logging.INFO,
