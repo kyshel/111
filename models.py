@@ -341,7 +341,10 @@ def get(model_name, num_classes, feature_extract=False, use_pretrained=True):
         # model_ft.fc = nn.Linear(num_ftrs, num_classes)
 
         from efficientnet_pytorch import EfficientNet
-        model_ft = EfficientNet.from_pretrained(model_name)
+        if use_pretrained:
+            model_ft = EfficientNet.from_pretrained(model_name)
+        else:
+            model_ft = EfficientNet.from_name(model_name)
         set_parameter_requires_grad(model_ft, feature_extract)
         num_ftrs = model_ft._fc.in_features
         model_ft._fc = nn.Linear(num_ftrs, num_classes)

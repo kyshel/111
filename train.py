@@ -598,12 +598,12 @@ if pretrained:
     ckpt = torch.load(weights, map_location=device)  # load checkpoint
     state_dict = ckpt['model'].float().state_dict()  # to FP32
     model_name = ckpt['model_name']
-    model = models.get(model_name,nc,opt.freeze,opt.nopre)
+    model = models.get(model_name,nc,opt.freeze,not opt.nopre)
     model.load_state_dict(state_dict, strict=False)  # load
     logger.info('Transferred %g/%g items from %s' % (len(state_dict), len(model.state_dict()), weights))  # report
 else:
     model_name = opt.model
-    model = models.get(model_name,nc,opt.freeze,opt.nopre)
+    model = models.get(model_name,nc,opt.freeze,not opt.nopre)
 model.to(device)
 logger.info("Loaded model: "+ model_name)
 
