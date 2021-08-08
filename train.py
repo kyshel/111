@@ -1,3 +1,4 @@
+# train.py  
 # %% preset
 
 from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
@@ -276,7 +277,8 @@ def inverse_normalize(tensor, mean =(0.5,0.5,0.5),std=(0.5,0.5,0.5)):
 # %% set opt
 # if __name__ == '__main__':
 parser = argparse.ArgumentParser()
-parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
+# universal
+parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters') # do not rm this
 parser.add_argument('--args', nargs='?', const=True, default=False,help='load args from file ')
 parser.add_argument('--weights', type=str, default='', help='initial weights path, override model')
 parser.add_argument('--repro', action='store_true', help='only save final checkpoint')
@@ -293,11 +295,15 @@ parser.add_argument('--kfold', nargs='?', const=True, default=False, help='resum
 parser.add_argument('--skfold', nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--seed', type=int, default=0, help='set seed for repro')
 parser.add_argument('--split', type=float,   default='0.8', help='set seed for repro')
-parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='[train, test] image sizes')
+parser.add_argument('--img-size', nargs='+', type=int, default=[320, 320], help='[train, test] image sizes')
 parser.add_argument('--data', type=str, default='cifar10.yaml', help='data.yaml path')
 parser.add_argument('--task', type=str, default='all', help='set seed for repro') # test, all
 parser.add_argument('--inspect',action='store_true', help='inspect model details') # test, all
 parser.add_argument('--cache',nargs='?', const=True, default=False, help='resume most recent training')
+parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
+
+# custom
+parser.add_argument('--cov_rawdir',nargs='?', const=True, default=False, help='resume most recent training')
 
 if isinteractive(): # not reliable, temp debug only  
     opt = parser.parse_args(args=[]) 
@@ -319,7 +325,7 @@ opt.batch = 32
 
 
 opt.data = 'Covid' # try Emoji Covid  '21cov_ich.yaml'
-opt.img_size = [340,340] # try
+opt.img_size = [340,340]  
 opt.skfold = '1/5' 
 # opt.nowandb = True
 opt.project = '21cov_lo'
@@ -343,7 +349,7 @@ opt.weights = '../re_exp7_best.pt'
 
 
 
-# opt args 
+# opt args  
 if opt.args:
     with open(opt.args) as f:
         args = argparse.Namespace(**yaml.safe_load(f))  # replace
@@ -355,24 +361,9 @@ if opt.args:
                 logger.info('{}: {} > {}'.format(k,v,v_overide ))
 
 
-# transform Covid
-train_mean, train_std = [0.5234, 0.5234, 0.5234], [0.2165, 0.2165, 0.2165]
-test_mean, test_std = [0.5213, 0.5213, 0.5213], [0.2199, 0.2199, 0.2199]
-transform_train = transforms.Compose([
-    transforms.RandomAutocontrast(),
-    transforms.Resize(opt.img_size),
-    transforms.ToTensor(), 
-        transforms.Normalize(train_mean,train_std)])
-transform_test = transforms.Compose([
-    transforms.RandomAutocontrast(),
-    transforms.Resize(opt.img_size),
-    transforms.ToTensor(),
-        transforms.Normalize(test_mean, test_std)])
-
-
-# init 
+# opt init 
 opt.nowandb = True if opt.task == 'test' else opt.nowandb
-opt.save_dir = str(increment_path(Path(opt.project) / opt.name))
+opt.save_dir = str(increment_path(Path(opt.project) / opt.name,exist_ok=opt.exist_ok))
 # task
 logger.info(f'[+]task \n{opt.task}')
 # proxy
@@ -477,7 +468,19 @@ except Exception:
     pass
 
 
-
+# transform Covid
+train_mean, train_std = [0.5234, 0.5234, 0.5234], [0.2165, 0.2165, 0.2165]
+test_mean, test_std = [0.5213, 0.5213, 0.5213], [0.2199, 0.2199, 0.2199]
+transform_train = transforms.Compose([
+    transforms.RandomAutocontrast(),
+    transforms.Resize(opt.img_size),
+    transforms.ToTensor(), 
+        transforms.Normalize(train_mean,train_std)])
+transform_test = transforms.Compose([
+    transforms.RandomAutocontrast(),
+    transforms.Resize(opt.img_size),
+    transforms.ToTensor(),
+        transforms.Normalize(test_mean, test_std)])
  
 
 #%% dataset 
@@ -486,6 +489,9 @@ logger.info('\n[+]dataset')
 import datasets
 # cache
 fp_cache = str(opt.cache)
+sid2cat_csvfp = '../00raw/train_study_level.csv' # custom
+if opt.cov_rawdir: # custom, need rm in lts
+    sid2cat_csvfp = str(Path(str(opt.cov_rawdir)) / 'train_study_level.csv')
 if str(fp_cache).endswith('.pkl') and os.path.isfile(fp_cache): 
     # use cache
     gb = os.path.getsize(fp_cache) / 1E9  # filesize
@@ -512,10 +518,11 @@ else:
     else:
         rawset = getattr(datasets, opt.data)  # manual build  
 
-    # load dataset
+    # load dataset, Covid custom here
     raw_train = rawset(
         root='../03png/train', 
         obj = '../11data/train_imginfo.obj',
+        csv = sid2cat_csvfp,
         train=True,
         transform=transform_train,
         cache_images = opt.cache,
@@ -525,6 +532,7 @@ else:
     raw_test = rawset(
         root='../03png/test', 
         obj = '../11data/test_imginfo.obj',
+        csv = sid2cat_csvfp,
         train=False,                    
         transform=transform_test,
         cache_images = opt.cache,

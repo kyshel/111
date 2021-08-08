@@ -1,14 +1,18 @@
 # ich
-ICH (Image Classification Hammer) is used for image classification tasks. 
+A hammer used for image classification tasks. 
 
-# usage
+# install
 ``` bash
 git clone https://github.com/kyshel/ich.git
 cd ich
 pip install -r requirements.txt
 ```
 
- 
+# usage
+``` bash
+python train.py 
+python train.py --model resnet18 
+```
 
 # p1
 - none
@@ -22,10 +26,11 @@ pip install -r requirements.txt
 - pretty progress bar 4row to 2row
 - add dataset img autocheck 
 - torch.resize  strech or keep ratio ? 
+- refactor custom
 
 
 # logs
-- v17 add cache
+- v17 add transformed dataset cache 
 - v16 add kfold and skolf  
 - v15 save .pt with optimzer not striped
 - v14 add model selection
