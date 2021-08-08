@@ -515,8 +515,7 @@ if str(fp_cache).endswith('.pkl') and os.path.isfile(fp_cache):
                 want_arg,
                 cached_arg,
             ) 
-else: 
-    # create cache
+else:  # create cache
     if opt.data.endswith('.yaml'):
         rawset = datasets.LoadImageLabels(opt.data) # auto-build by yaml
     else:
@@ -645,7 +644,16 @@ if pretrained:
 scheduler = lr_scheduler.StepLR(optimizer, step_size=300, gamma=2)
 scheduler.last_epoch = start_epoch - 1  # do not move
 
+# test task
+if opt.task == 'test':
+    logger.info('\n[+]test')
+    logger.info('loading best model ')
+    # model.load_state_dict(best_model_wts)
+    # will error as sliced
+    test(testloader,model,testset=raw_test,is_savecsv=1,opt=opt,save_dir = save_dir) 
 
+    logger.info('End Test!')
+    exit()
 
 # visual init
 logger.info('\n[+]visual')
@@ -720,16 +728,7 @@ if opt.inspect:
     print("Input shape:",input_shape)
     summary(model, input_shape)
 
-# test task
-if opt.task == 'test':
-    logger.info('\n[+]test')
-    logger.info('loading best model ')
-    # model.load_state_dict(best_model_wts)
-    # will error as sliced
-    test(testloader,model,testset=raw_test,is_savecsv=1,opt=opt,save_dir = save_dir) 
 
-    logger.info('End Test!')
-    exit()
 
 
 # Start Training >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
