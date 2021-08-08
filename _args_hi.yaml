@@ -1,0 +1,10 @@
+
+
+# for hidden dataset 
+cov_rawdir: /kaggle/input/siim-covid19-detection
+inspect: False 
+repro: True 
+task: test
+exist_ok: True
+name: exp
+project: 21cov_hi
