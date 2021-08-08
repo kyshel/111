@@ -310,17 +310,20 @@ opt.batch = 32
 opt.data = 'Covid' # try Emoji Covid  '21cov_ich.yaml'
 opt.img_size = [340,340] # try
 opt.skfold = '1/5' 
-opt.nowandb = True
+# opt.nowandb = True
 opt.project = '21cov_lo'
 opt.workers = 8
 opt.repro = True 
-opt.cache = 'pkl/t7_340.pkl'  
-opt.inspect = True
+# opt.cache = '../13pkl/t7.pkl'  # t6_64 t7_340 t8_340
+# opt.freeze = True # need opt.model 
+# opt.inspect = True
 # opt.seed = 1 
 # opt.split = 0.8 # no-fold
-opt.freeze = True # need opt.model 
 # opt.proxy = True
-# opt.weights = '28emoji/exp21/weights/best.pt'
+opt.task = 'test'
+# opt.weights = '21cov_lo/exp108/weights/last.pt'
+opt.weights = '../re_exp7_best.pt'
+
 # opt.resume = '28emoji/exp38/weights/last.pt'
 # opt.args = 'args.yaml'
 # opt.notest = True
@@ -344,17 +347,20 @@ if opt.args:
 # transform Covid
 train_mean, train_std = [0.5234, 0.5234, 0.5234], [0.2165, 0.2165, 0.2165]
 test_mean, test_std = [0.5213, 0.5213, 0.5213], [0.2199, 0.2199, 0.2199]
-transform_train = transforms.Compose(
-    [transforms.Resize(opt.img_size),
+transform_train = transforms.Compose([
+    transforms.RandomAutocontrast(),
+    transforms.Resize(opt.img_size),
     transforms.ToTensor(), 
         transforms.Normalize(train_mean,train_std)])
-transform_test = transforms.Compose(
-    [transforms.Resize(opt.img_size),
+transform_test = transforms.Compose([
+    transforms.RandomAutocontrast(),
+    transforms.Resize(opt.img_size),
     transforms.ToTensor(),
         transforms.Normalize(test_mean, test_std)])
 
 
 # opt extend 
+opt.nowandb = True if opt.task == 'test' else opt.nowandb
 opt.save_dir = str(increment_path(Path(opt.project) / opt.name))
 # proxy
 if opt.proxy:
@@ -458,6 +464,8 @@ except Exception:
     pass
 
 
+
+ 
 
 #%% dataset 
 # dataset
@@ -686,6 +694,18 @@ if opt.inspect:
     input_shape = next(iter(trainloader))[0][0].shape
     print("Input shape:",input_shape)
     summary(model, input_shape)
+
+# test task
+if opt.task == 'test':
+    logger.info('\n[+]test')
+    logger.info('loading best model ')
+    # model.load_state_dict(best_model_wts)
+    # will error as sliced
+    test(testloader,model,testset=raw_test,is_savecsv=1,opt=opt,save_dir = save_dir) 
+
+    logger.info('End Test!')
+    exit()
+
 
 # Start Training >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 logger.info('\n[+]train')

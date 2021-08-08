@@ -8,9 +8,6 @@ cd ich
 pip install -r requirements.txt
 ```
 
-# queue
-- use data augmention like transform
-
 # meme
 - DO NOT improve batch > 32, current use 32 as base
 
@@ -19,20 +16,16 @@ pip install -r requirements.txt
 - none
 
 # p9
-- add cmds to logger
-- create test.py
-- add opt.emoji_pkl
+- add --task
 - unify dataset
-- repro not work in notebook
-- isinteractive not reliable
-- add repro2 for vgg 
 - add custom dataset
 - fit custom dataset to official dataset 
-- add cache 
 - refactor: rename funcs, like pix,cid,fn
 - pretty progress bar 4row to 2row
 
+
 # logs
+- v17 add cache
 - v16 add kfold and skolf  
 - v15 save .pt with optimzer not striped
 - v14 add model selection
@@ -44,6 +37,10 @@ pip install -r requirements.txt
 - v8 resume ok
 - v7 add checkpoint 
 - v6 save last.pt and best.pt
+
+# leave it 
+- repro not work in notebook
+- isinteractive not reliable
 
 # devlop info
 Developed in vscode with interactive features
