@@ -476,12 +476,12 @@ except Exception:
 train_mean, train_std = [0.5234, 0.5234, 0.5234], [0.2165, 0.2165, 0.2165]
 test_mean, test_std = [0.5213, 0.5213, 0.5213], [0.2199, 0.2199, 0.2199]
 transform_train = transforms.Compose([
-    transforms.RandomAutocontrast(),
+    # transforms.RandomAutocontrast(),  # not work in 1.7.0
     transforms.Resize(opt.img_size),
     transforms.ToTensor(), 
         transforms.Normalize(train_mean,train_std)])
 transform_test = transforms.Compose([
-    transforms.RandomAutocontrast(),
+    # transforms.RandomAutocontrast(),   # not work in 1.7.0
     transforms.Resize(opt.img_size),
     transforms.ToTensor(),
         transforms.Normalize(test_mean, test_std)])
