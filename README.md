@@ -8,9 +8,7 @@ cd ich
 pip install -r requirements.txt
 ```
 
-# meme
-- DO NOT improve batch > 32, current use 32 as base
-
+ 
 
 # p1
 - none
@@ -22,6 +20,8 @@ pip install -r requirements.txt
 - fit custom dataset to official dataset 
 - refactor: rename funcs, like pix,cid,fn
 - pretty progress bar 4row to 2row
+- add dataset img autocheck 
+- torch.resize  strech or keep ratio ? 
 
 
 # logs

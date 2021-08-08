@@ -121,10 +121,11 @@ def test(loader,
     # info = None,
     save_dir = Path(''),
     testset = None,
-    is_training = False,
+    is_training = False, # will replace by task=val
     is_savecsv = False,
     criterion = None,
     optimizer = None,
+    task = 'test', # test, val 
     ):
 
     
@@ -142,6 +143,7 @@ def test(loader,
     running_corrects = 0
     val_acc,val_loss = 0,0
     pred_list = []
+    softmax_list = []
     
     model.eval()
     with torch.no_grad():
@@ -157,6 +159,11 @@ def test(loader,
             outputs = model(images)
             _, preds = torch.max(outputs.data, 1)  # predicted is a batch tensor result
             pred_list += preds.tolist()
+
+            if task == 'test':
+                softmax_outputs = torch.nn.functional.softmax (outputs, 1)
+                softmax_list += softmax_outputs.tolist()
+             
             
             if is_training:
                 loss = criterion(outputs, labels)
@@ -177,10 +184,12 @@ def test(loader,
   
     # savecsv
     if is_savecsv:
+        # task must = test
         fn_list = loader.dataset.filenames
         df = pd.DataFrame(columns=['filename','cid'])
         df['filename'] = fn_list
         df['cid'] = pred_list
+        df['softmax'] = softmax_list
         unified_fp = str(save_dir/'predictions.csv')
         df.to_csv(unified_fp, encoding='utf-8', index=False)
         logger.info('Done! Check csv: '+ unified_fp )
@@ -291,11 +300,13 @@ parser.add_argument('--inspect',action='store_true', help='inspect model details
 parser.add_argument('--cache',nargs='?', const=True, default=False, help='resume most recent training')
 
 if isinteractive(): # not reliable, temp debug only  
-    logger.info('[+]notebook \nNotebook mode ')
     opt = parser.parse_args(args=[]) 
+    logger.info(f'[+]mode \nnotebook ')
+    
 else:
-    logger.info('[+]bash \nBash mode')
     opt = parser.parse_args()
+    logger.info(f'[+]mode \nbash ')
+    
     
 ### opt explicit
 
@@ -359,9 +370,11 @@ transform_test = transforms.Compose([
         transforms.Normalize(test_mean, test_std)])
 
 
-# opt extend 
+# init 
 opt.nowandb = True if opt.task == 'test' else opt.nowandb
 opt.save_dir = str(increment_path(Path(opt.project) / opt.name))
+# task
+logger.info(f'[+]task \n{opt.task}')
 # proxy
 if opt.proxy:
     if opt.proxy == True:
@@ -801,6 +814,7 @@ for epoch in range(start_epoch,epochs):
             'loss': epoch_loss,
             'best_acc': best_acc,
             'wandb_id': wandb.run.id if wandb else None,
+            'opt':opt,
         }
         torch.save(ckpt, last)
         if this_best:
