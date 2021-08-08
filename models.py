@@ -1,4 +1,6 @@
 
+
+from packaging import version
 import torch.nn as nn
 import torch
 from torch.nn import parameter
@@ -21,7 +23,8 @@ if os.environ[repro_flag] == '1':
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
     torch.manual_seed(seed)
     np.random.seed(seed)
-    torch.use_deterministic_algorithms(True)
+    if version.parse(torch.__version__) >= version.parse("1.8.0"):
+        torch.use_deterministic_algorithms(True)
     torch.backends.cudnn.deterministic = True
     g = torch.Generator()
     g.manual_seed(seed)

@@ -8,3 +8,5 @@ task: test
 exist_ok: True
 name: exp
 project: 21cov_hi
+workers: 2
+weights: ../21cov_re_ich_exp7_acc64.pt

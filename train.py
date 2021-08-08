@@ -1,6 +1,7 @@
 # train.py  
 # %% preset
 
+from packaging import version
 from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
 from shutil import copyfile
 import random  
@@ -319,7 +320,7 @@ else:
 
 # basic  res18 vgg11 efb0 efficientnet-b7   alexnet squeezenet1_0 densenet121                     
 opt.model = 'efb0' 
-opt.epochs = 60
+opt.epochs = 3
 opt.batch = 32
 
 
@@ -365,7 +366,7 @@ if opt.args:
 opt.nowandb = True if opt.task == 'test' else opt.nowandb
 opt.save_dir = str(increment_path(Path(opt.project) / opt.name,exist_ok=opt.exist_ok))
 # task
-logger.info(f'[+]task \n{opt.task}')
+logger.info(f'\n[+]task \n{opt.task}')
 # proxy
 if opt.proxy:
     if opt.proxy == True:
@@ -393,19 +394,22 @@ if opt.repro:
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
     torch.manual_seed(seed)
     np.random.seed(seed)
-    torch.use_deterministic_algorithms(True)
+    if version.parse(torch.__version__) >= version.parse("1.8.0"):
+        torch.use_deterministic_algorithms(True)
     torch.backends.cudnn.deterministic = True
     g = torch.Generator()
     g.manual_seed(seed)
     if isinteractive(): 
         logger.info(' U R in interative, torch.use_deterministic_algorithms set False !')
-        torch.use_deterministic_algorithms(False)
+        if version.parse(torch.__version__) >= version.parse("1.8.0"):
+            torch.use_deterministic_algorithms(False)
     logger.info('Enabled, seed: {}, ICH_REPRO: {}'.format(os.environ['ICH_SEED'],os.environ['ICH_REPRO']))
 else: 
     os.environ['ICH_REPRO'] = '0'
     os.environ['ICH_SEED'] = str(seed)
     import models # must after os.emviron is defined
-    torch.use_deterministic_algorithms(False) # for notenook!
+    if version.parse(torch.__version__) >= version.parse("1.8.0"):
+        torch.use_deterministic_algorithms(False) # for notenook!
     g = torch.Generator()
     g.manual_seed(seed)
     logger.info('Disabled.')
