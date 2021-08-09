@@ -6,3 +6,7 @@ PyYAML>=5.3.1
 torchsummary
 
 efficientnet_pytorch 
+
+wandb
+
+pickle5

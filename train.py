@@ -309,6 +309,10 @@ parser.add_argument('--exist-ok', action='store_true', help='existing project/na
 
 # custom
 parser.add_argument('--cov_rawdir',nargs='?', const=True, default=False, help='resume most recent training')
+parser.add_argument('--raw_train_root',nargs='?', const=True, default=False, help='resume most recent training')
+parser.add_argument('--raw_test_root',nargs='?', const=True, default=False, help='resume most recent training')
+
+
 
 if isinteractive(): # not reliable, temp debug only  
     opt = parser.parse_args(args=[]) 
@@ -527,7 +531,7 @@ else:  # create cache
 
     # load dataset, Covid custom here
     raw_train = rawset(
-        root='../03png/train', 
+        root= opt.raw_train_root if opt.raw_train_root else '../03png/train' , 
         obj = '../11data/train_imginfo.obj',
         csv = sid2cat_csvfp,
         train=True,
@@ -537,7 +541,7 @@ else:  # create cache
         workers = opt.workers,
         )
     raw_test = rawset(
-        root='../03png/test', 
+        root= opt.raw_test_root if opt.raw_test_root else '../03png/test', 
         obj = '../11data/test_imginfo.obj',
         csv = sid2cat_csvfp,
         train=False,                    
