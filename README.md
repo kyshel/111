@@ -15,12 +15,11 @@ python train.py --model resnet18
 ```
 
 # p1
-- none
+- add custom dataset
 
 # p9
 - add --task
 - unify dataset
-- add custom dataset
 - fit custom dataset to official dataset 
 - refactor: rename funcs, like pix,cid,fn
 - pretty progress bar 4row to 2row
