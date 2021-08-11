@@ -1,5 +1,6 @@
 # snippets that assist devleop
 # type: ignore
+# flake8: noqa
 
 # %%
 # %%
