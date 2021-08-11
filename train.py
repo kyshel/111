@@ -306,6 +306,10 @@ parser.add_argument('--task', type=str, default='all', help='set seed for repro'
 parser.add_argument('--inspect',action='store_true', help='inspect model details') # test, all
 parser.add_argument('--cache',nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
+parser.add_argument('--project', default='runs/train', help='save to project/name')
+parser.add_argument('--workers', type=int, default=8, help='maximum number of dataloader workers')
+
+
 
 # custom
 parser.add_argument('--cov_rawdir',nargs='?', const=True, default=False, help='resume most recent training')
@@ -323,9 +327,32 @@ else:
     logger.info(f'[+]mode \nbash ')
     
     
-### opt explicit
+### dev.yaml
+
+dev_yaml = 'dev.yaml'
+if (not opt.args) and os.path.isfile(dev_yaml):
+    with open(dev_yaml) as f:
+        args = argparse.Namespace(**yaml.safe_load(f))  # replace
+        logger.info(f'\n[+]dev_yaml \n FOUND {dev_yaml} !  OVERIDING: '   )
+        # for k,v in opt.__dict__.items(): # ensure no new args
+        #     if hasattr(args, k):
+                 
+        #         setattr(opt, k, v_overide)  # override
+        #         logger.info('{}: {} > {}'.format(k,v,v_overide ))
+        #     else:   # new args not defined in parser.add_argument
+        #         pass
+
+        # v_overide =  getattr(args, k) 
+
+        for k,v_overide in args.__dict__.items(): # ensure no new args
+            setattr(opt, k, v_overide)  # override
+            if hasattr(opt, k):
+                logger.info('{}: {} > {}'.format(k,getattr(opt, k),v_overide ))
+            else:
+                logger.info('{}: {} > {}'.format(k,'not-def',v_overide ))
 
 
+'''
 # basic  res18 vgg11 efb0 efficientnet-b7   alexnet squeezenet1_0 densenet121                     
 opt.model = 'efb0' 
 opt.epochs = 3
@@ -333,7 +360,7 @@ opt.batch = 32
 
 
 
-opt.data = 'Covid' # try Emoji Covid  '21cov_ich.yaml'
+opt.data = 'Covid' # try Emoji Covid  '21cov_ich.yaml' data.yaml
 opt.img_size = [340,340]  
 opt.skfold = '1/5' 
 # opt.nowandb = True
@@ -354,7 +381,7 @@ opt.weights = '../re_exp7_best.pt'
 # opt.args = 'args.yaml'
 # opt.notest = True
 # opt.nosave = True
-
+'''
 
 
 
@@ -525,7 +552,7 @@ if str(fp_cache).endswith('.pkl') and os.path.isfile(fp_cache):
             ) 
 else:  # create cache
     if opt.data.endswith('.yaml'):
-        uniset = datasets.LoadImageLabels(opt.data) # auto-build by yaml
+        uniset = datasets.LoadImageAndLabels(opt) # auto-build by yaml
     else:
         rawset = getattr(datasets, opt.data)  # manual build  
 

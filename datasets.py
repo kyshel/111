@@ -257,3 +257,26 @@ class Covid(Dataset):
         return pid2cid
 
  
+class LoadImageAndLabels(VisionDataset):  # delete 
+    _repr_indent = 4
+
+    def __init__(
+            self,
+            root: str,
+            transforms: Optional[Callable] = None,
+            transform: Optional[Callable] = None,
+            target_transform: Optional[Callable] = None,
+    ) -> None:
+        print(123)
+        pass
+
+    def __getitem__(self, index: int) -> Any:
+         pass
+
+    def __len__(self) -> int:
+         pass
+
+
+
+
+

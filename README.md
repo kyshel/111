@@ -18,6 +18,8 @@ python train.py --model resnet18
 - add custom dataset
 
 # p9
+- add download.py 
+- add actions for smoke
 - add --task
 - unify dataset
 - fit custom dataset to official dataset 
