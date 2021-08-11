@@ -212,7 +212,7 @@ def get(model_name, num_classes, feature_extract=False, use_pretrained=True):
     model_name = 'efficientnet-b0' if model_name in ['efb0'] else model_name
 
     if model_name == "basic":
-        before_liner = 2704
+        before_liner = 250000
         model_ft = nn.Sequential( # > 3 48 48
                 nn.Conv2d(3,6,5), # > 6 44 44
                 nn.ReLU(),

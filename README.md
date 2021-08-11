@@ -15,8 +15,9 @@ python train.py --model resnet18
 ```
 
 # p1
-- add custom dataset
-- remove dev.yaml loose load, add strict mode
+- custom dataset add cache 
+- add auto download dataset 
+- make smoke test pass
 
 # p9
 - add badge 
@@ -33,6 +34,8 @@ python train.py --model resnet18
 
 
 # logs
+- v19 add custom dataset
+- v18 remove dev.yaml loose load, add strict mode
 - v17 add transformed dataset cache 
 - v16 add kfold and skolf  
 - v15 save .pt with optimzer not striped

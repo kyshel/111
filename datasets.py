@@ -21,25 +21,52 @@ from itertools import repeat
 from tqdm import tqdm 
 import sys
 from pathlib import Path
+import glob
+import logging
+import argparse
+import yaml 
+from pprint import pprint 
 
+logger = logging.getLogger(__name__)
 
 # repro >>> start
 repro_flag = "ICH_REPRO"
 repro_seed = "ICH_SEED"
 # if repro_flag not in os.environ:
 #     raise Exception('Please set repro flag: '+repro_flag)
-
-seed = int(os.environ[repro_seed])
-if os.environ[repro_flag] == '1':
-    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    if version.parse(torch.__version__) >= version.parse("1.8.0"):
-        torch.use_deterministic_algorithms(True)
-    torch.backends.cudnn.deterministic = True
-    g = torch.Generator()
-    g.manual_seed(seed)
+if (repro_flag in os.environ) and (repro_seed in os.environ):
+    seed = int(os.environ[repro_seed])
+    if os.environ[repro_flag] == '1':
+        os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        if version.parse(torch.__version__) >= version.parse("1.8.0"):
+            torch.use_deterministic_algorithms(True)
+        torch.backends.cudnn.deterministic = True
+        g = torch.Generator()
+        g.manual_seed(seed)
+else:
+    logger.info("Not repro as repro_flag not set or repro_seed not set !")
 # repro <<< end 
+
+img_formats = ['bmp', 'jpg', 'jpeg', 'png', 'tif', 'tiff', 'dng', 'webp', 'mpo']  # acceptable image suffixes
+ 
+
+
+def exif_size(img):
+    # Returns exif-corrected PIL size
+    s = img.size  # (width, height)
+    try:
+        rotation = dict(img._getexif().items())[orientation]
+        if rotation == 6:  # rotation 270
+            s = (s[1], s[0])
+        elif rotation == 8:  # rotation 90
+            s = (s[1], s[0])
+    except:
+        pass
+
+    return s
+
 
 
 # Emoji
@@ -238,6 +265,7 @@ class Covid(Dataset):
         obj = self.obj
 
         df = pd.read_csv(csv)
+        
 
         study2cat_map={}
         for i, row in df.iterrows():
@@ -263,34 +291,141 @@ class LoadImageAndLabels(VisionDataset):  # delete
 
     def __init__(
             self,
-            root: str,
-            transforms: Optional[Callable] = None,
+            opt,
+            train = True,
+            logger = logger,
+            # root: str,
+            # transforms: Optional[Callable] = None,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
-    ) -> None:
-        print(123)
+            prefix ='',
+            workers = 8,
+
+        ) -> None:
+ 
+        self.split = 'train' if train else 'test'
+        if transform:
+            self.transform = transform
+
+        # get data.yaml info 
+        with open(opt.data) as f:
+            data = argparse.Namespace(**yaml.safe_load(f))  # replace
+        src = Path(data.src)
+        nc = data.nc
+        csv_fp = Path(data.src) / 'labels.csv'
+        self.classes = data.names
+
+        # make pid2cid map from labels.csv
+        df = pd.read_csv(csv_fp,converters={0:str,1:int})
+        pids = df[df.columns[0]].astype(str).tolist()
+        cids = df[df.columns[1]].astype(int).tolist()
+        pid2cid = dict(zip(pids, cids))
+ 
+        # make files list from images
+        f = []
+        files = {}
+        for split in 'train','test':
+            files[split] = sorted(glob.glob( str(src / split / '*')  ))
+   
+        # make info 
+        info = []
+        nf,nm,ns,nc = 0,0,0,0
+        pbar = tqdm(files[self.split])
+        for f in pbar:
+            fp = Path(f)
+            try:
+                # check imgs
+                im = Image.open(f)
+                im.verify()
+                shape = exif_size(im)  # image size 
+
+                pid_f = fp.stem # {pid_f}.png
+                if pid_f in pid2cid:  
+                    nf += 1  # image found label
+                    info += [[pid_f, pid2cid[pid_f], f] ]
+                else:               
+                    nm += 1  # image missing label
+                    info += [[pid_f, 0, f]]
+                    
+            except Exception as e:
+                nc += 1 # image corrupted 
+                logger.info(f'{prefix}WARNING: Ignoring corrupted image and/or label {f}: {e}')
+
+            ns = len(pbar) - nf - nm - nc  # image shortaged
+            pbar.desc = f"{prefix}Scanning '{src}' images and labels... " \
+                        f"{nf} found, {nm} miss, {nc} corrupted, {ns} shortage"
+        pbar.close()
+        
+        self.info = info
+        self.pids = [i[0] for i in info]
+        self.cids = [i[1] for i in info]
+        self.pfps = [i[2] for i in info]
+
+        self.labels = [self.classes[i[1]] for i in info]
+        
+
+        # print(self.cids )
 
 
 
+        # self.data = {
+        #     'train': train_info,  # [ [fn,label], ...  ]
+        #     'test': test_info,    # [ [fn,0], ...  ]
+        # }
 
-        pass
+
 
     def __getitem__(self, index: int) -> Any:
-         pass
+        if torch.is_tensor(index):
+            index = index.tolist()
+
+        current = self.info[index]
+        _pid, cid, pfp = current[0],current[1],current[2] 
+        pix = Image.open(pfp).convert('RGB')
+
+        if self.transform:
+            pix = self.transform(pix)
+        
+        return pix,cid,pfp
+
 
     def __len__(self) -> int:
-         pass
+        return len(self.info)
+
+    # def load_img(self,idx):
+    #     if torch.is_tensor(idx):
+    #         idx = idx.tolist()
+        
+    #     cid = self.pid2cid[idx][1] 
+    #     pid = self.pid2cid[idx][0]
+
+    #     fn = pid + '.png'
+    #     fp = os.path.join(self.root,  fn)
+    #     im = Image.open(fp).convert('RGB')
+    #     # pix = np.array(im)
+    #     pix = im
+
+    #     if self.transform:
+    #         pix = self.transform(pix)
+
+    #     return pix,cid,pid
+
+
+    
 
 if __name__ == '__main__':
-    import argparse, yaml
-    from pprint import pprint 
+    logger.info("Running directly...")
+ 
     yaml_fp = '27bra_lo/exp5/opt.yaml'
-    with open('yaml_fp') as f:
+    with open(yaml_fp) as f:
         opt = argparse.Namespace(**yaml.safe_load(f))  # replace
 
 
-        pprint(opt)
-        # aaa = LoadImageAndLabels(opt)
+        # print(opt)
+        aaa = LoadImageAndLabels(opt,train = True)
+        bbb = LoadImageAndLabels(opt,train = False)
 
 
 
+
+# %%

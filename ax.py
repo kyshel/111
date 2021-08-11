@@ -25,7 +25,7 @@ time.tzset()
 
 def nowtime(style = 0):
   
-  if style == 0:
+  if style == 0:  
     fmt = "%Y%m%d_%H%M%S" 
   elif style == 1:
     fmt = "%Y-%m-%d %H:%M:%S" 

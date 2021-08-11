@@ -194,7 +194,7 @@ def test(loader,
     # savecsv
     if is_savecsv:
         # task must = test
-        fn_list = loader.dataset.filenames
+        fn_list = loader.dataset.pids
         df = pd.DataFrame(columns=['filename','cid'])
         df['filename'] = fn_list
         df['cid'] = pred_list
@@ -330,7 +330,9 @@ else:
     logger.info(f'[+]mode \nbash ')
     
     
-### dev.yaml
+### dev section start >>>
+
+# load opt from dev.yaml
 dev_yaml = 'dev.yaml'
 if (not opt.args) and os.path.isfile(dev_yaml):
     logger.info(f'[+]dev.yaml')
@@ -341,6 +343,17 @@ if (not opt.args) and os.path.isfile(dev_yaml):
                 v_overide =  getattr(args, k)  
                 setattr(opt, k, v_overide)  # override
                 logger.info('{}: {} > {}'.format(k,v,v_overide ))
+        not_valid = list(set(args.__dict__.keys()) - set(opt.__dict__.keys()))
+        if not_valid: logger.info(f'Warning! {not_valid} not valid')  
+
+# check exec dir 
+filenames = ['models.py','datasets.py','requirements.txt',]
+for f in filenames:
+    if  not os.path.isfile(f):
+        raise Exception("Exec in wrong dir! Should in repo dir currently.")
+
+
+### dev section end <<<
 
 
 '''
@@ -544,29 +557,32 @@ if str(fp_cache).endswith('.pkl') and os.path.isfile(fp_cache):
                 cached_arg,
             ) 
 else:  # create cache
-    if opt.data.endswith('.yaml'):
-        uniset = datasets.LoadImageAndLabels(opt) # auto-build by yaml
-    else:
+    if opt.data.endswith('.yaml'): # load dataset by yaml 
+        # uniset = datasets.LoadImageAndLabels(opt) # auto-build by yaml
+        # uniset = getattr(datasets, 'LoadImageAndLabels') 
+        rawset = datasets.LoadImageAndLabels
+    else: # load dataset by name
         rawset = getattr(datasets, opt.data)  # manual build  
-
-    # load dataset, Covid custom here
+        # load dataset, Covid custom here
     raw_train = rawset(
-        root= opt.raw_train_root if opt.raw_train_root else '../03png/train' , 
-        obj = '../11data/train_imginfo.obj',
-        csv = sid2cat_csvfp,
+        opt,
+        # root= opt.raw_train_root if opt.raw_train_root else '../03png/train' , 
+        # obj = '../11data/train_imginfo.obj',
+        # csv = sid2cat_csvfp,
         train=True,
         transform=transform_train,
-        cache_images = opt.cache,
+        # cache_images = opt.cache,
         prefix = 'raw_train:',
         workers = opt.workers,
         )
     raw_test = rawset(
-        root= opt.raw_test_root if opt.raw_test_root else '../03png/test', 
-        obj = '../11data/test_imginfo.obj',
-        csv = sid2cat_csvfp,
+        opt,
+        # root= opt.raw_test_root if opt.raw_test_root else '../03png/test', 
+        # obj = '../11data/test_imginfo.obj',
+        # csv = sid2cat_csvfp,
         train=False,                    
         transform=transform_test,
-        cache_images = opt.cache,
+        # cache_images = opt.cache,
         prefix = 'raw_test:',
         workers = opt.workers,
         )
@@ -590,7 +606,7 @@ if opt.kfold or opt.skfold:  # fold, will ignore split_dot
         logger.info('StratifiedKFold: ' + fold_str)
         fold_obj = StratifiedKFold(n_splits=nf, random_state=seed, shuffle=True)
 
-    for i_fold, ids in enumerate(fold_obj.split(raw_train,raw_train.targets)):
+    for i_fold, ids in enumerate(fold_obj.split(raw_train,raw_train.cids)):
         if (i_fold + 1) == cf:
             trainset = torch.utils.data.Subset(raw_train,ids[0])
             validset = torch.utils.data.Subset(raw_train,ids[1])
@@ -728,7 +744,7 @@ try:
 except Exception as e:
     logger.info(e)
 # visual cls distri 
-plot_cls_bar(raw_train.targets, save_dir, raw_train)
+plot_cls_bar(raw_train.labels, save_dir, raw_train)
 # writer.add_image('cls_distri_img', cls_distri_img, 0)
 # writer.add_histogram('raw_train_classes', torch.tensor(raw_train.targets), 1)
 # writer.add_histogram('raw_test_classes', torch.tensor(raw_test.targets), 1)
