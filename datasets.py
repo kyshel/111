@@ -1,5 +1,6 @@
 # datasets
 
+# %% datasets
 # preset
 from packaging import version
 from torchvision.datasets.vision import VisionDataset
@@ -25,8 +26,8 @@ from pathlib import Path
 # repro >>> start
 repro_flag = "ICH_REPRO"
 repro_seed = "ICH_SEED"
-if repro_flag not in os.environ:
-    raise Exception('Please set repro flag: '+repro_flag)
+# if repro_flag not in os.environ:
+#     raise Exception('Please set repro flag: '+repro_flag)
 
 seed = int(os.environ[repro_seed])
 if os.environ[repro_flag] == '1':
@@ -268,6 +269,10 @@ class LoadImageAndLabels(VisionDataset):  # delete
             target_transform: Optional[Callable] = None,
     ) -> None:
         print(123)
+
+
+
+
         pass
 
     def __getitem__(self, index: int) -> Any:
@@ -276,7 +281,16 @@ class LoadImageAndLabels(VisionDataset):  # delete
     def __len__(self) -> int:
          pass
 
+if __name__ == '__main__':
+    import argparse, yaml
+    from pprint import pprint 
+    yaml_fp = '27bra_lo/exp5/opt.yaml'
+    with open('yaml_fp') as f:
+        opt = argparse.Namespace(**yaml.safe_load(f))  # replace
 
+
+        pprint(opt)
+        # aaa = LoadImageAndLabels(opt)
 
 
 

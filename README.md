@@ -16,8 +16,10 @@ python train.py --model resnet18
 
 # p1
 - add custom dataset
+- remove dev.yaml loose load, add strict mode
 
 # p9
+- add badge 
 - add download.py 
 - add actions for smoke
 - add --task

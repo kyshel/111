@@ -43,6 +43,9 @@ from util import increment_path,strip_optimizer,colorstr
 from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
 
+# timestamp
+TIMESTAMP = ax.nowtime(1) #  %Y-%m-%d %H:%M:%S
+
 # logger 
 for handler in logging.root.handlers[:]:  
     # https://stackoverflow.com/questions/12158048/changing-loggings-basicconfig-which-is-already-set
@@ -308,8 +311,8 @@ parser.add_argument('--cache',nargs='?', const=True, default=False, help='resume
 parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
 parser.add_argument('--project', default='runs/train', help='save to project/name')
 parser.add_argument('--workers', type=int, default=8, help='maximum number of dataloader workers')
-
-
+parser.add_argument('--batch', type=int, default=16, help='total batch size for all GPUs')
+parser.add_argument('--epochs', type=int, default=300)
 
 # custom
 parser.add_argument('--cov_rawdir',nargs='?', const=True, default=False, help='resume most recent training')
@@ -328,28 +331,16 @@ else:
     
     
 ### dev.yaml
-
 dev_yaml = 'dev.yaml'
 if (not opt.args) and os.path.isfile(dev_yaml):
+    logger.info(f'[+]dev.yaml')
     with open(dev_yaml) as f:
         args = argparse.Namespace(**yaml.safe_load(f))  # replace
-        logger.info(f'\n[+]dev_yaml \n FOUND {dev_yaml} !  OVERIDING: '   )
-        # for k,v in opt.__dict__.items(): # ensure no new args
-        #     if hasattr(args, k):
-                 
-        #         setattr(opt, k, v_overide)  # override
-        #         logger.info('{}: {} > {}'.format(k,v,v_overide ))
-        #     else:   # new args not defined in parser.add_argument
-        #         pass
-
-        # v_overide =  getattr(args, k) 
-
-        for k,v_overide in args.__dict__.items(): # ensure no new args
-            setattr(opt, k, v_overide)  # override
-            if hasattr(opt, k):
-                logger.info('{}: {} > {}'.format(k,getattr(opt, k),v_overide ))
-            else:
-                logger.info('{}: {} > {}'.format(k,'not-def',v_overide ))
+        for k,v in opt.__dict__.items(): # ensure no new args
+            if hasattr(args, k):
+                v_overide =  getattr(args, k)  
+                setattr(opt, k, v_overide)  # override
+                logger.info('{}: {} > {}'.format(k,v,v_overide ))
 
 
 '''
@@ -389,7 +380,7 @@ opt.weights = '../re_exp7_best.pt'
 if opt.args:
     with open(opt.args) as f:
         args = argparse.Namespace(**yaml.safe_load(f))  # replace
-        logger.info('\n[+]args \nWarning! Overding args from '+ opt.args)
+        logger.info('[+]args \nWarning! Overding args from '+ opt.args)
         for k,v in opt.__dict__.items(): # ensure no new args
             if hasattr(args, k):
                 v_overide =  getattr(args, k)  
@@ -401,14 +392,14 @@ if opt.args:
 opt.nowandb = True if opt.task == 'test' else opt.nowandb
 opt.save_dir = str(increment_path(Path(opt.project) / opt.name,exist_ok=opt.exist_ok))
 # task
-logger.info(f'\n[+]task \n{opt.task}')
+logger.info(f'[+]task \n{opt.task}')
 # proxy
 if opt.proxy:
     if opt.proxy == True:
         proxy_url = "http://127.0.0.1:1080" 
     else:
         proxy_url = opt.proxy
-    print("\n[+]proxy \nProxy has been set to "+ proxy_url)
+    print("[+]proxy \nProxy has been set to "+ proxy_url)
     os.environ['http_proxy'] = proxy_url
     os.environ['https_proxy'] = proxy_url
 # env
@@ -419,7 +410,7 @@ else:
 
 
 # Reproducibility,  NOT work in notebook!
-logger.info('\n[+]repro')
+logger.info('[+]repro')
 seed = random.randint(0,9999)
 if opt.repro:
     seed = opt.seed
@@ -480,7 +471,9 @@ last = wdir / 'last.pt'
 best = wdir / 'best.pt'
 results_file = save_dir / 'results.txt'
 logger.addHandler(logging.FileHandler(save_dir / 'logger.txt')) 
-logger.info('\n[+]opt\n' + json.dumps(opt.__dict__, sort_keys=True) )
+logger.info(f'[+]timestamp \n{TIMESTAMP}')
+logger.info('[+]opt')
+logger.info(opt)
 # Save run settings
 # with open(save_dir / 'hyp.yaml', 'w') as f:
 #     yaml.safe_dump(hyp, f, sort_keys=False)
@@ -489,7 +482,7 @@ with open(save_dir / 'opt.yaml', 'w') as f:
 
 
 # gpu  
-msg = "\n[+]device \nICH 🚀 v0.1 Using device: {}".format(device) 
+msg = "[+]device \nICH 🚀 v0.1 Using device: {}".format(device) 
 #Additional Info when using cuda
 if device.type == 'cuda':
     msg = msg + " ["
@@ -524,7 +517,7 @@ transform_test = transforms.Compose([
 
 #%% dataset 
 # dataset
-logger.info('\n[+]dataset')
+logger.info('[+]dataset')
 import datasets
 # cache
 fp_cache = str(opt.cache)
@@ -626,7 +619,7 @@ logger.info("Loaded dataset: " + opt.data)
 
 
 # model
-logger.info('\n[+]model')
+logger.info('[+]model')
 pretrained = weights.endswith('.pt')
 if pretrained:
     ckpt = torch.load(weights, map_location=device)  # load checkpoint
@@ -682,7 +675,7 @@ scheduler.last_epoch = start_epoch - 1  # do not move
 
 # test task
 if opt.task == 'test':
-    logger.info('\n[+]test')
+    logger.info('[+]test')
     logger.info('loading best model ')
     # model.load_state_dict(best_model_wts)
     # will error as sliced
@@ -692,7 +685,7 @@ if opt.task == 'test':
     exit()
 
 # visual init
-logger.info('\n[+]visual')
+logger.info('[+]visual')
 # Tensorboard
 prefix = colorstr('tensorboard: ')
 logger.info(f"{prefix}Start with 'tensorboard --logdir {opt.project}', view at http://localhost:6006/")
@@ -741,7 +734,7 @@ plot_cls_bar(raw_train.targets, save_dir, raw_train)
 # writer.add_histogram('raw_test_classes', torch.tensor(raw_test.targets), 1)
 
 # visual info 
-logger.info("\n[+]info")
+logger.info("[+]info")
 dataset_msg = 'No msg'
 if opt.kfold:
     dataset_msg = "Kfold: " + opt.kfold
@@ -768,7 +761,7 @@ if opt.inspect:
 
 
 # Start Training >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-logger.info('\n[+]train')
+logger.info('[+]train')
 logger.info('Logging results to ' + str(save_dir))
 logger.info('Starting training for {} epochs...'.format(epochs))
 best_model_wts = copy.deepcopy(model.state_dict())
@@ -899,7 +892,7 @@ logger.info('End Train!')
 
 
 # %% test
-logger.info('\n[+]test')
+logger.info('[+]test')
 logger.info('loading best model ')
 model.load_state_dict(best_model_wts)
 # will error as sliced
