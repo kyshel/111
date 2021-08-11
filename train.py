@@ -525,7 +525,7 @@ if str(fp_cache).endswith('.pkl') and os.path.isfile(fp_cache):
             ) 
 else:  # create cache
     if opt.data.endswith('.yaml'):
-        rawset = datasets.LoadImageLabels(opt.data) # auto-build by yaml
+        uniset = datasets.LoadImageLabels(opt.data) # auto-build by yaml
     else:
         rawset = getattr(datasets, opt.data)  # manual build  
 
