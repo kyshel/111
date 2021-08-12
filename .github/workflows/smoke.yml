@@ -35,6 +35,11 @@ jobs:
       run: |
         # pytest
         echo 'disable pytest'
+        
+    - name: wandb
+      run: |
+        wandb login ${{ secrets.WANDB }}
+        
     - name: train.py no opt
       run: |
         python train.py 
