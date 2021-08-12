@@ -48,17 +48,18 @@ jobs:
       run: |
         python train.py --project ich_ci --cache cache.pkl --name ${git_hash}_cache
         
-    - name: train.py --repro
-      run: |
-        python train.py --project ich_ci --cache cache.pkl --repro ${git_hash}_repro1
-        python train.py --project ich_ci --cache cache.pkl --repro ${git_hash}_repro2
-        
+    
     - name: train.py --kfold
       run: |
         python train.py --project ich_ci --cache cache.pkl --repro --kfold 2/5 --name ${git_hash}_kfold
         python train.py --project ich_ci --cache cache.pkl --repro --skfold 3/5 --name ${git_hash}_skfold
         
-      
+    - name: train.py --repro  # repro at the end to ensure all args worked
+      run: |
+        python train.py --project ich_ci --cache cache.pkl --repro --skfold 4/5 --name ${git_hash}_repro1
+        python train.py --project ich_ci --cache cache.pkl --repro --skfold 4/5 --name ${git_hash}_repro2
+        
+        
     - name: train.py --task tset
       run: |
         python train.py --project ich_ci --cache cache.pkl \
