@@ -20,20 +20,11 @@ python train.py --epochs 60 --batch 1024 --img-size 32  # customize
 
 
 ## p1
-- custom dataset add cache 
-- add auto download dataset 
-- make smoke test pass
+- none
+
 
 ## p9
-- add badge 
-- add download.py 
-- add actions for smoke
-- add --task
-- unify dataset
-- fit custom dataset to official dataset 
-- refactor: rename funcs, like pix,cid,fn
 - pretty progress bar 4row to 2row
-- add dataset img autocheck 
 - torch.resize  strech or keep ratio ? 
 - refactor custom
 - open in colab
@@ -42,6 +33,13 @@ python train.py --epochs 60 --batch 1024 --img-size 32  # customize
 
 
 ## logs
+- v26 add badge 
+- v25 add --task
+- v24 refactor: rename funcs, like pix,cid,fn
+- v23 add dataset img autocheck 
+- v22 make smoke test pass
+- v21 add auto download dataset 
+- v20 custom dataset add cache 
 - v19 add custom dataset
 - v18 remove dev.yaml loose load, add strict mode
 - v17 add transformed dataset cache 

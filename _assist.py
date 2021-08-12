@@ -4,9 +4,33 @@
 
 # %%
 # %%
-# %%
-# %% 
+# %% download url
 
+
+import os
+os.environ['http_proxy'] = "http://127.0.0.1:1080" 
+os.environ['https_proxy'] = "http://127.0.0.1:1080" 
+
+import requests
+requests.get("http://google.com")
+
+
+
+from torchvision.datasets.utils import check_integrity, download_and_extract_archive
+
+
+a = download_and_extract_archive(
+    url = 'https://github.com/kyshel/cifar10/releases/download/v1/cifar10_png.tgz',
+    download_root = 'lab' ,
+
+)
+
+print(a)
+
+
+
+# %% 
+exit()
 
 
 
