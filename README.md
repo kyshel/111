@@ -1,25 +1,26 @@
 # ich
+![smoke_test](https://github.com/kyshel/ich/actions/workflows/smoke.yml/badge.svg)
 A hammer used for image classification tasks. 
 
-# install
+## install
 ``` bash
 git clone https://github.com/kyshel/ich.git
 cd ich
 pip install -r requirements.txt
 ```
 
-# usage
+## usage
 ``` bash
 python train.py 
 python train.py --model resnet18 
 ```
 
-# p1
+## p1
 - custom dataset add cache 
 - add auto download dataset 
 - make smoke test pass
 
-# p9
+## p9
 - add badge 
 - add download.py 
 - add actions for smoke
@@ -31,9 +32,12 @@ python train.py --model resnet18
 - add dataset img autocheck 
 - torch.resize  strech or keep ratio ? 
 - refactor custom
+- open in colab
+- open in kaggle
+- docker pull
 
 
-# logs
+## logs
 - v19 add custom dataset
 - v18 remove dev.yaml loose load, add strict mode
 - v17 add transformed dataset cache 
@@ -49,11 +53,11 @@ python train.py --model resnet18
 - v7 add checkpoint 
 - v6 save last.pt and best.pt
 
-# leave it 
+## leave it 
 - repro not work in notebook
 - isinteractive not reliable
 
-# devlop info
+## devlop info
 Developed in vscode with interactive features
 
 
