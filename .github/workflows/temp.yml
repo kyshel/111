@@ -21,16 +21,24 @@ jobs:
       with:
         python-version: 3.7
 
+
+    - name: Declare some variables
+      id: vars
+      shell: bash
+      run: |
+        echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
+
         
     - name: temp
       run: |
-        git_hash=$(git rev-parse --short "$GITHUB_SHA")
-        echo ${git_hash}_123123
+
+        echo ${{ steps.vars.outputs.sha_short }}}_123123
         
         
     - name: temp2
       run: |
-        echo ${git_hash}_456456
+        echo ${{ steps.vars.outputs.sha_short }}}_456456
 
 
 
