@@ -13,7 +13,7 @@ import os
 import numpy as np
 from typing import Any, Callable, Optional, Tuple
 import ax
-from PIL import Image
+from PIL import Image, ExifTags
 from torch.utils.data import Dataset
 import pandas as pd
 from multiprocessing.pool import ThreadPool
@@ -27,7 +27,21 @@ import argparse
 import yaml 
 from pprint import pprint 
 
+# logger 
+for handler in logging.root.handlers[:]:  
+    # https://stackoverflow.com/questions/12158048/changing-loggings-basicconfig-which-is-already-set
+    logging.root.removeHandler(handler)
+logging.basicConfig(
+        format="%(message)s",
+        level=logging.INFO,
+        handlers=[
+            # logging.FileHandler(save_dir / 'logger.txt'), # should get dir after 
+            logging.StreamHandler()
+        ]
+    )
 logger = logging.getLogger(__name__)
+# logger.addHandler(logging.FileHandler(f'_logger_{os.path.basename(__file__)}.txt')) 
+
 
 # repro >>> start
 repro_flag = "ICH_REPRO"
@@ -46,11 +60,15 @@ if (repro_flag in os.environ) and (repro_seed in os.environ):
         g = torch.Generator()
         g.manual_seed(seed)
 else:
-    logger.info("Not repro as repro_flag not set or repro_seed not set !")
+    logger.info("Not repro!")
 # repro <<< end 
 
 img_formats = ['bmp', 'jpg', 'jpeg', 'png', 'tif', 'tiff', 'dng', 'webp', 'mpo']  # acceptable image suffixes
- 
+
+# Get orientation exif tag
+for orientation in ExifTags.TAGS.keys():
+    if ExifTags.TAGS[orientation] == 'Orientation':
+        break 
 
 
 def exif_size(img):
@@ -300,12 +318,14 @@ class LoadImageAndLabels(VisionDataset):  # delete
             target_transform: Optional[Callable] = None,
             prefix ='',
             workers = 8,
+            cache_images = None, 
 
         ) -> None:
- 
-        self.split = 'train' if train else 'test'
-        if transform:
-            self.transform = transform
+
+        split = 'train' if train else 'test'
+        self.split = split
+        self.cache_images = cache_images
+        self.transform = transform
 
         # get data.yaml info 
         with open(opt.data) as f:
@@ -313,39 +333,39 @@ class LoadImageAndLabels(VisionDataset):  # delete
         src = Path(data.src)
         nc = data.nc
         csv_fp = Path(data.src) / 'labels.csv'
-        self.classes = data.names
+        self.names = data.names
 
         # make pid2cid map from labels.csv
         df = pd.read_csv(csv_fp,converters={0:str,1:int})
-        pids = df[df.columns[0]].astype(str).tolist()
-        cids = df[df.columns[1]].astype(int).tolist()
-        pid2cid = dict(zip(pids, cids))
+        images = df[df.columns[0]].astype(str).tolist()
+        labels = df[df.columns[1]].astype(int).tolist()
+        image2label = dict(zip(images, labels))
  
         # make files list from images
-        f = []
+        # f = []
         files = {}
-        for split in 'train','test':
-            files[split] = sorted(glob.glob( str(src / split / '*')  ))
+        files = sorted(glob.glob( str(src / split / '*')  ))
+        images = [x for x in files if x.split('.')[-1].lower() in img_formats]
    
         # make info 
-        info = []
+        info = []  # final container
         nf,nm,ns,nc = 0,0,0,0
-        pbar = tqdm(files[self.split])
-        for f in pbar:
-            fp = Path(f)
+        pbar = tqdm(images)
+        for fp in pbar:
+            fo = Path(fp)
             try:
                 # check imgs
-                im = Image.open(f)
+                im = Image.open(fp)
                 im.verify()
                 shape = exif_size(im)  # image size 
 
-                pid_f = fp.stem # {pid_f}.png
-                if pid_f in pid2cid:  
+                image_f = fo.stem # {image_f}.png
+                if image_f in image2label:          
+                    info += [[image_f, image2label[image_f], fp] ]  # image, label, path
                     nf += 1  # image found label
-                    info += [[pid_f, pid2cid[pid_f], f] ]
-                else:               
+                else:                               
+                    info += [[image_f, 0, fp]]
                     nm += 1  # image missing label
-                    info += [[pid_f, 0, f]]
                     
             except Exception as e:
                 nc += 1 # image corrupted 
@@ -357,58 +377,52 @@ class LoadImageAndLabels(VisionDataset):  # delete
         pbar.close()
         
         self.info = info
-        self.pids = [i[0] for i in info]
-        self.cids = [i[1] for i in info]
-        self.pfps = [i[2] for i in info]
+        self.images = [i[0] for i in info]
+        self.labels = [i[1] for i in info]
+        self.paths = [i[2] for i in info]
 
-        self.labels = [self.classes[i[1]] for i in info]
+        n = len(self.info)
+        self.pixs = [None] * n
+
+        # cache 
+        if self.cache_images:
+            gb=0
+            ids = range(n)
+            results = ThreadPool(workers).imap(self.load_pix,  ids  )  
+            pbar = tqdm(enumerate(results), total=n, mininterval=1,)
+            for i, x in pbar:
+                self.pixs[i] = x  
+                # gb += self.pixs[i].nbytes # sys.getsizeof(b.storage())
+                gb +=  sys.getsizeof(self.pixs[i].storage())
+                pbar.desc = f'{prefix}Caching images ({gb / 1E9:.1f}GB)'
+            pbar.close()
+
+
         
-
-        # print(self.cids )
-
-
-
-        # self.data = {
-        #     'train': train_info,  # [ [fn,label], ...  ]
-        #     'test': test_info,    # [ [fn,0], ...  ]
-        # }
 
 
 
     def __getitem__(self, index: int) -> Any:
-        if torch.is_tensor(index):
-            index = index.tolist()
-
-        current = self.info[index]
-        _pid, cid, pfp = current[0],current[1],current[2] 
-        pix = Image.open(pfp).convert('RGB')
-
-        if self.transform:
-            pix = self.transform(pix)
+        label = self.labels[index]
+        path = self.paths[index]
+        if self.cache_images:
+            return self.pixs[index], label, path # pix, label, path
+        else:
+            return self.load_pix(index), label, path 
         
-        return pix,cid,pfp
 
 
     def __len__(self) -> int:
         return len(self.info)
 
-    # def load_img(self,idx):
-    #     if torch.is_tensor(idx):
-    #         idx = idx.tolist()
-        
-    #     cid = self.pid2cid[idx][1] 
-    #     pid = self.pid2cid[idx][0]
+    def load_pix(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+        pix = Image.open(self.paths[idx]).convert('RGB')
+        if self.transform: pix = self.transform(pix)
+        return pix  
 
-    #     fn = pid + '.png'
-    #     fp = os.path.join(self.root,  fn)
-    #     im = Image.open(fp).convert('RGB')
-    #     # pix = np.array(im)
-    #     pix = im
 
-    #     if self.transform:
-    #         pix = self.transform(pix)
-
-    #     return pix,cid,pid
 
 
     

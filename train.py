@@ -72,26 +72,26 @@ def seed_worker(worker_id):
     random.seed(worker_seed)
 
 def plot_cls_bar(cls_list, save_dir, dataset = None):
-    # plot bar of classes
+    # plot bar of labels
     data =  Counter(cls_list)
     cls_id_list = list(data.keys())
     num_list = list(data.values())
     x = cls_id_list
     y = num_list
     if dataset:
-        if hasattr(dataset, 'cls_names'):
-            x = [str(id) + '' + dataset.cls_names[id]  for id in cls_id_list]
+        if hasattr(dataset, 'names'):
+            x = [str(id) + '' + dataset.names[id]  for id in cls_id_list]
  
     # https://stackoverflow.com/questions/19576317/matplotlib-savefig-does-not-save-axes/67369132#67369132
     fig = plt.figure(facecolor=(1, 1, 1) )
     # creating the bar plot
     plt.bar(x, y, color ='maroon',
             width = 0.4)
-    plt.xlabel("Classes")
-    plt.ylabel("No. of class")
+    plt.xlabel("labels")
+    plt.ylabel("No. of label")
     plt.title("Class distribute")
     
-    save_fp = os.path.join(str(save_dir), "classes_distribute.png")
+    save_fp = os.path.join(str(save_dir), "labels_distribute.png")
     plt.savefig(save_fp, bbox_inches='tight')
     plt.close(fig)
     # plt.show()
@@ -194,10 +194,10 @@ def test(loader,
     # savecsv
     if is_savecsv:
         # task must = test
-        fn_list = loader.dataset.pids
-        df = pd.DataFrame(columns=['filename','cid'])
-        df['filename'] = fn_list
-        df['cid'] = pred_list
+        fn_list = loader.dataset.images
+        df = pd.DataFrame(columns=['image','label'])
+        df['image'] = fn_list
+        df['label'] = pred_list
         df['softmax'] = softmax_list
         unified_fp = str(save_dir/'predictions.csv')
         df.to_csv(unified_fp, encoding='utf-8', index=False)
@@ -213,7 +213,7 @@ def test(loader,
         #     # print(i)
         #     fn = df.iloc[i]['name']
         #     cls_id =map_fn2cid[fn]
-        #     df.at[i, 'label'] = loader.dataset.classes[cls_id]
+        #     df.at[i, 'label'] = loader.dataset.labels[cls_id]
         # df.to_csv(csv_fp, encoding='utf-8', index=False)
         # logger.info('done! check: '+ csv_fp )
 
@@ -225,7 +225,7 @@ def test(loader,
 
 # test(testloader,model,testset=raw_test,is_savecsv=1)
 
-def infer(loader,model,classes,batch_index = 0, num = 4 ):
+def infer(loader,model,names,batch_index = 0, num = 4 ):
   # test images in loader
   dataiter = iter(loader)
   images, labels,_ = next(itertools.islice(dataiter,batch_index,None))
@@ -238,24 +238,24 @@ def infer(loader,model,classes,batch_index = 0, num = 4 ):
   outputs = model(images)
   _, predicted = torch.max(outputs, 1)
  
-  print('Predicted: ', ' '.join('%5s' % classes[predicted[j]]
+  print('Predicted: ', ' '.join('%5s' % names[predicted[j]]
                               for j in range(len(images))))
-  print('GroundTruth: ', ' '.join('%5s' % classes[labels[j]] for j in range(len(images))))
+  print('GroundTruth: ', ' '.join('%5s' % names[labels[j]] for j in range(len(images))))
 
   match_str =' '.join([('v' if (labels[j] == predicted[j] ) else 'x') 
               for j in range(len(images))])
   print('Result: ',match_str)
 
-def show(loader,classes = None ,num=4, mean =(0.5,0.5,0.5),std=(0.5,0.5,0.5)):
+def show(loader,names = None ,num=4, mean =(0.5,0.5,0.5),std=(0.5,0.5,0.5)):
     # preview train 
     # get some random training images
-    classes = loader.dataset.classes if not classes else classes
+    names = loader.dataset.names if not names else names
     dataiter = iter(loader)
     images, labels, filenames = dataiter.next()
     images = images[:num]
     # show images
     imshow(torchvision.utils.make_grid(images),mean,std)
-    print(' '.join('%5s' % classes[labels[j]] for j in range(len(images))))
+    print(' '.join('%5s' % names[labels[j]] for j in range(len(images))))
     
 
 
@@ -279,7 +279,7 @@ def inverse_normalize(tensor, mean =(0.5,0.5,0.5),std=(0.5,0.5,0.5)):
 
 
  
-# infer(validloader,model,classes,3)
+# infer(validloader,model,names,3)
 
 
 # %% set opt
@@ -350,7 +350,7 @@ if (not opt.args) and os.path.isfile(dev_yaml):
 filenames = ['models.py','datasets.py','requirements.txt',]
 for f in filenames:
     if  not os.path.isfile(f):
-        raise Exception("Exec in wrong dir! Should in repo dir currently.")
+        raise Exception("Exec in wrong dir! Should exec in repo dir.")
 
 
 ### dev section end <<<
@@ -594,8 +594,8 @@ else:  # create cache
         ax.save_obj([raw_train,raw_test,opt],fp_cache)  
 
 # fold
-classes = raw_train.classes
-nc = len(classes)
+names = raw_train.names
+nc = len(names)
 if opt.kfold or opt.skfold:  # fold, will ignore split_dot
     fold_str = opt.kfold if opt.kfold else opt.skfold
     nf, cf = int(fold_str.split('/')[1]),int(fold_str.split('/')[0]) # num-fold,current-fold
@@ -606,7 +606,7 @@ if opt.kfold or opt.skfold:  # fold, will ignore split_dot
         logger.info('StratifiedKFold: ' + fold_str)
         fold_obj = StratifiedKFold(n_splits=nf, random_state=seed, shuffle=True)
 
-    for i_fold, ids in enumerate(fold_obj.split(raw_train,raw_train.cids)):
+    for i_fold, ids in enumerate(fold_obj.split(raw_train,raw_train.labels)):
         if (i_fold + 1) == cf:
             trainset = torch.utils.data.Subset(raw_train,ids[0])
             validset = torch.utils.data.Subset(raw_train,ids[1])
@@ -746,8 +746,8 @@ except Exception as e:
 # visual cls distri 
 plot_cls_bar(raw_train.labels, save_dir, raw_train)
 # writer.add_image('cls_distri_img', cls_distri_img, 0)
-# writer.add_histogram('raw_train_classes', torch.tensor(raw_train.targets), 1)
-# writer.add_histogram('raw_test_classes', torch.tensor(raw_test.targets), 1)
+# writer.add_histogram('raw_train_labels', torch.tensor(raw_train.labels), 1)
+# writer.add_histogram('raw_test_labels', torch.tensor(raw_test.labels), 1)
 
 # visual info 
 logger.info("[+]info")
@@ -760,7 +760,7 @@ else:
     dataset_msg = "Split_dot: " + str(split_dot)
 summary_str = "- dataset: {}".format(dataset_msg)
 summary_str += "  raw_train:{},raw_test:{}, trainset:{}, validset:{}, nc:{}, batch:{},  ".format(
-     len(raw_train),len(raw_test),len(trainset),len(validset),len(classes),batch_size,  
+     len(raw_train),len(raw_test),len(trainset),len(validset),len(names),batch_size,  
 )
 # logger.info(model)
 logger.info(summary_str)
