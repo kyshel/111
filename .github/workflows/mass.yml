@@ -32,9 +32,12 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
         
-    - name: define git_hash
-      run: |   
-        git_hash=$(git rev-parse --short "$GITHUB_SHA")
+    - name: Declare some variables
+      id: vars
+      shell: bash
+      run: |
+        echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
         
     - name: wandb login 
       run: |
@@ -43,28 +46,28 @@ jobs:
     - name: train.py --project --name 
       run: |
         echo ${git_hash}123123
-        python train.py --project ich_ci --name ${git_hash}_raw 
+        python train.py --project ich_ci --name ${{ steps.vars.outputs.sha_short }}_raw 
         
     - name: train.py --cache
       run: |
-        python train.py --project ich_ci --cache cache.pkl --name ${git_hash}_cache
+        python train.py --project ich_ci --cache cache.pkl --name ${{ steps.vars.outputs.sha_short }}_cache
         
     
     - name: train.py --kfold
       run: |
-        python train.py --project ich_ci --cache cache.pkl --repro --kfold 2/5 --name ${git_hash}_kfold
-        python train.py --project ich_ci --cache cache.pkl --repro --skfold 3/5 --name ${git_hash}_skfold
+        python train.py --project ich_ci --cache cache.pkl --repro --kfold 2/5 --name ${{ steps.vars.outputs.sha_short }}_kfold
+        python train.py --project ich_ci --cache cache.pkl --repro --skfold 3/5 --name ${{ steps.vars.outputs.sha_short }}_skfold
         
     - name: train.py --repro  # repro at the end to ensure all args worked
       run: |
-        python train.py --project ich_ci --cache cache.pkl --repro --skfold 4/5 --name ${git_hash}_repro1
-        python train.py --project ich_ci --cache cache.pkl --repro --skfold 4/5 --name ${git_hash}_repro2
+        python train.py --project ich_ci --cache cache.pkl --repro --skfold 4/5 --name ${{ steps.vars.outputs.sha_short }}_repro1
+        python train.py --project ich_ci --cache cache.pkl --repro --skfold 4/5 --name ${{ steps.vars.outputs.sha_short }}_repro2
         
         
     - name: train.py --task tset
       run: |
         python train.py --project ich_ci --cache cache.pkl \
-        --task test --weights ich_ci/${git_hash}_skfold/best.strip.pt --name ${git_hash}_kfold
+        --task test --weights ich_ci/${git_hash}_skfold/best.strip.pt --name ${{ steps.vars.outputs.sha_short }}_kfold
         
       
         
