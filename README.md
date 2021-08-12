@@ -1,6 +1,6 @@
-# ich
-
-![smoke_test](https://github.com/kyshel/ich/actions/workflows/ci.yml/badge.svg)
+# ich  
+![basic_test](https://github.com/kyshel/ich/actions/workflows/basic.yml/badge.svg)
+![mass_test](https://github.com/kyshel/ich/actions/workflows/mass.yml/badge.svg)
 
 A hammer used for image classification tasks. 
 
