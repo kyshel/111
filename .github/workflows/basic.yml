@@ -38,7 +38,7 @@ jobs:
         
     - name: remove wandb
       run: |
-        pip uninstall wandb
+        pip uninstall wandb -y
         
     - name: train.py no opt
       run: |
