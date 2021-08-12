@@ -32,9 +32,16 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
         
+    - name: define git_hash
+      run: |   
+        git_hash=$(git rev-parse --short "$GITHUB_SHA")
+        
+    - name: wandb login 
+      run: |
+        wandb login ${{ secrets.WANDB }}
+      
     - name: train.py --project --name 
       run: |
-        git_hash=$(git rev-parse --short "$GITHUB_SHA")
         python train.py --project ich_ci --name ${git_hash}_raw 
         
     - name: train.py --cache
