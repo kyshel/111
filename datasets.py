@@ -305,7 +305,10 @@ class Covid(Dataset):
     
         return pid2cid
 
+
  
+
+
 class LoadImageAndLabels(VisionDataset):  # delete 
     _repr_indent = 4
 
@@ -360,7 +363,7 @@ class LoadImageAndLabels(VisionDataset):  # delete
    
         # make info 
         info = []  # final valid contariner
-        nf,nm,ns,nc = 0,0,0,0
+        nf,nm,nc = 0,0,0
         pbar = tqdm(images)
         for fp in pbar:
             fo = Path(fp)
@@ -382,9 +385,9 @@ class LoadImageAndLabels(VisionDataset):  # delete
                 nc += 1 # image corrupted 
                 logger.info(f'{prefix}WARNING: Ignoring corrupted image and/or label {f}: {e}')
 
-            ns = len(pbar) - nf - nm - nc  # image shortaged
+            # ns = len(pbar) - nf - nm - nc  # image shortaged
             pbar.desc = f"{prefix}Scanning '{src}' images and labels... " \
-                        f"{nf} found, {nm} miss, {nc} corrupted, {ns} shortage"
+                        f"{nf} found, {nm} miss, {nc} corrupted "
         pbar.close()
         
         self.info = info

@@ -303,7 +303,7 @@ parser.add_argument('--kfold', nargs='?', const=True, default=False, help='resum
 parser.add_argument('--skfold', nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--seed', type=int, default=0, help='set seed for repro')
 parser.add_argument('--split', type=float,   default='0.8', help='set seed for repro')
-parser.add_argument('--img-size', nargs='+', type=int, default=[320, 320], help='[train, test] image sizes')
+parser.add_argument('--img-size', nargs='+', type=int, default=[32, 32], help='[train, test] image sizes')
 parser.add_argument('--data', type=str, default='cifar10.yaml', help='data.yaml path')
 parser.add_argument('--task', type=str, default='all', help='set seed for repro') # test, all
 parser.add_argument('--inspect',action='store_true', help='inspect model details') # test, all
@@ -311,8 +311,8 @@ parser.add_argument('--cache',nargs='?', const=True, default=False, help='resume
 parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
 parser.add_argument('--project', default='runs', help='save to project/name')
 parser.add_argument('--workers', type=int, default=8, help='maximum number of dataloader workers')
-parser.add_argument('--batch', type=int, default=16, help='total batch size for all GPUs')
-parser.add_argument('--epochs', type=int, default=100)
+parser.add_argument('--batch', type=int, default=256, help='total batch size for all GPUs')
+parser.add_argument('--epochs', type=int, default=3)
 parser.add_argument('--nodev', action='store_true', help='only save final checkpoint')
 
 # custom
