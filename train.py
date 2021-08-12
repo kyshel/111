@@ -1,6 +1,8 @@
 # train.py  
 # %% preset
 
+import psutil
+# import multiprocessing
 from packaging import version
 from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
 from shutil import copyfile
@@ -138,16 +140,13 @@ def test(loader,
     ):
 
     
-
+    device = next(model.parameters()).device  # get model device
     if is_training:
-        device = next(model.parameters()).device  # get model device
-        
         cols = ('','','val_loss','val_acc')
         # cols = ('val_loss','val_acc','','')
     else:
         logger.info("Predicting test dataset...")
-        device = torch.device('cuda:0' if torch.cuda.is_available()  else 'cpu')
-
+ 
     running_loss = 0.0
     running_corrects = 0
     val_acc,val_loss = 0,0
@@ -304,16 +303,17 @@ parser.add_argument('--skfold', nargs='?', const=True, default=False, help='resu
 parser.add_argument('--seed', type=int, default=0, help='set seed for repro')
 parser.add_argument('--split', type=float,   default='0.8', help='set seed for repro')
 parser.add_argument('--img-size', nargs='+', type=int, default=[32, 32], help='[train, test] image sizes')
-parser.add_argument('--data', type=str, default='cifar10.yaml', help='data.yaml path')
+parser.add_argument('--data', type=str, default='cifar2.yaml', help='data.yaml path')
 parser.add_argument('--task', type=str, default='all', help='set seed for repro') # test, all
 parser.add_argument('--inspect',action='store_true', help='inspect model details') # test, all
 parser.add_argument('--cache',nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
 parser.add_argument('--project', default='runs', help='save to project/name')
-parser.add_argument('--workers', type=int, default=8, help='maximum number of dataloader workers')
+parser.add_argument('--workers', type=int, default=0, help='maximum number of dataloader workers, 0 is auto detect')
 parser.add_argument('--batch', type=int, default=256, help='total batch size for all GPUs')
 parser.add_argument('--epochs', type=int, default=3)
 parser.add_argument('--nodev', action='store_true', help='only save final checkpoint')
+parser.add_argument('--nogpu', action='store_true', help='only save final checkpoint')
 
 # custom
 parser.add_argument('--cov_rawdir',nargs='?', const=True, default=False, help='resume most recent training')
@@ -370,9 +370,13 @@ if opt.args:
 
 
 # opt init 
+opt_data_fasts = ['cifar10','27bra','cifa2']
+phyzical_cores = psutil.cpu_count(logical = False)
+logical_cores = psutil.cpu_count(logical = True)
+opt.data = f"{opt.data}.yaml" if opt.data in opt_data_fasts else opt.data
 opt.nowandb = True if opt.task == 'test' else opt.nowandb
 opt.save_dir = str(increment_path(Path(opt.project) / opt.name,exist_ok=opt.exist_ok))
-opt.data = f"{opt.data}.yaml" if opt.data in ['cifar10','27bra'] else opt.data
+opt.workers = logical_cores if opt.workers == 0 else opt.workers
 # task
 logger.info(f'[+]task \n{opt.task}')
 # proxy
@@ -464,6 +468,7 @@ with open(save_dir / 'opt.yaml', 'w') as f:
 
 
 # gpu  
+if opt.nogpu: device = torch.device('cpu')
 msg = "[+]device \nICH 🚀 v0.1 Using device: {}".format(device) 
 #Additional Info when using cuda
 if device.type == 'cuda':
