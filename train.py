@@ -298,7 +298,7 @@ parser.add_argument('--nowandb', action='store_true', help='disable wandb')
 parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--proxy', nargs='?', const=True, default=False, help='proxy')
 parser.add_argument('--name', default='exp', help='save to project/name')
-parser.add_argument('--model', default='model_basic', help='set model when from scratch')
+parser.add_argument('--model', default='resnet18', help='set model when from scratch')
 parser.add_argument('--kfold', nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--skfold', nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--seed', type=int, default=0, help='set seed for repro')
@@ -309,10 +309,11 @@ parser.add_argument('--task', type=str, default='all', help='set seed for repro'
 parser.add_argument('--inspect',action='store_true', help='inspect model details') # test, all
 parser.add_argument('--cache',nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
-parser.add_argument('--project', default='runs/train', help='save to project/name')
+parser.add_argument('--project', default='runs', help='save to project/name')
 parser.add_argument('--workers', type=int, default=8, help='maximum number of dataloader workers')
 parser.add_argument('--batch', type=int, default=16, help='total batch size for all GPUs')
-parser.add_argument('--epochs', type=int, default=300)
+parser.add_argument('--epochs', type=int, default=100)
+parser.add_argument('--nodev', action='store_true', help='only save final checkpoint')
 
 # custom
 parser.add_argument('--cov_rawdir',nargs='?', const=True, default=False, help='resume most recent training')
@@ -334,7 +335,7 @@ else:
 
 # load opt from dev.yaml
 dev_yaml = 'dev.yaml'
-if (not opt.args) and os.path.isfile(dev_yaml):
+if (not opt.nodev) and (not opt.args) and os.path.isfile(dev_yaml):
     logger.info(f'[+]dev.yaml')
     with open(dev_yaml) as f:
         args = argparse.Namespace(**yaml.safe_load(f))  # replace
@@ -356,39 +357,6 @@ for f in filenames:
 ### dev section end <<<
 
 
-'''
-# basic  res18 vgg11 efb0 efficientnet-b7   alexnet squeezenet1_0 densenet121                     
-opt.model = 'efb0' 
-opt.epochs = 3
-opt.batch = 32
-
-
-
-opt.data = 'Covid' # try Emoji Covid  '21cov_ich.yaml' data.yaml
-opt.img_size = [340,340]  
-opt.skfold = '1/5' 
-# opt.nowandb = True
-opt.project = '21cov_lo'
-opt.workers = 8
-opt.repro = True 
-# opt.cache = '../13pkl/t7.pkl'  # t6_64 t7_340 t8_340
-# opt.freeze = True # need opt.model 
-# opt.inspect = True
-# opt.seed = 1 
-# opt.split = 0.8 # no-fold
-# opt.proxy = True
-opt.task = 'test'
-# opt.weights = '21cov_lo/exp108/weights/last.pt'
-opt.weights = '../re_exp7_best.pt'
-
-# opt.resume = '28emoji/exp38/weights/last.pt'
-# opt.args = 'args.yaml'
-# opt.notest = True
-# opt.nosave = True
-'''
-
-
-
 # opt args  
 if opt.args:
     with open(opt.args) as f:
@@ -404,6 +372,7 @@ if opt.args:
 # opt init 
 opt.nowandb = True if opt.task == 'test' else opt.nowandb
 opt.save_dir = str(increment_path(Path(opt.project) / opt.name,exist_ok=opt.exist_ok))
+opt.data = f"{opt.data}.yaml" if opt.data in ['cifar10','27bra'] else opt.data
 # task
 logger.info(f'[+]task \n{opt.task}')
 # proxy
@@ -558,12 +527,10 @@ if str(fp_cache).endswith('.pkl') and os.path.isfile(fp_cache):
             ) 
 else:  # create cache
     if opt.data.endswith('.yaml'): # load dataset by yaml 
-        # uniset = datasets.LoadImageAndLabels(opt) # auto-build by yaml
-        # uniset = getattr(datasets, 'LoadImageAndLabels') 
         rawset = datasets.LoadImageAndLabels
-    else: # load dataset by name
+    else:                          #  load dataset by name
         rawset = getattr(datasets, opt.data)  # manual build  
-        # load dataset, Covid custom here
+
     raw_train = rawset(
         opt,
         # root= opt.raw_train_root if opt.raw_train_root else '../03png/train' , 
@@ -571,7 +538,7 @@ else:  # create cache
         # csv = sid2cat_csvfp,
         train=True,
         transform=transform_train,
-        # cache_images = opt.cache,
+        cache_images = opt.cache,
         prefix = 'raw_train:',
         workers = opt.workers,
         )
@@ -582,7 +549,7 @@ else:  # create cache
         # csv = sid2cat_csvfp,
         train=False,                    
         transform=transform_test,
-        # cache_images = opt.cache,
+        cache_images = opt.cache,
         prefix = 'raw_test:',
         workers = opt.workers,
         )

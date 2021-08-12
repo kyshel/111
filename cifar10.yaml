@@ -1,0 +1,38 @@
+# define datasets
+
+# Require: src, names, nc
+# dataset should be organized like this:
+
+# src_dir/
+# |
+# |-- labels.csv
+# |
+# |-- test
+# |   |-- 00001.png
+# |   |-- 00013.png
+# |   `-- 00015.png
+# |   
+# `-- train
+#     |-- 00000.png
+#     |-- 00002.png
+#     `-- 00003.png
+
+# labels.csv should like this:
+
+# image,label
+# 00000,1
+# 00002,1
+# 00003,0
+
+
+# dataset source dir (require)
+src: ./_tmp/cifar10_png      
+
+# label names (require)
+names: [ 'airplane','automobile','bird','cat','deer','dog','frog','horse','ship','truck']  
+
+# label names count 
+nc:   10                 
+
+# download url
+download: https://github.com/kyshel/cifar10/releases/download/v1/cifar10_png.tgz # Optional

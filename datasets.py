@@ -26,6 +26,8 @@ import logging
 import argparse
 import yaml 
 from pprint import pprint 
+from torchvision.datasets.utils import check_integrity, download_and_extract_archive
+
 
 # logger 
 for handler in logging.root.handlers[:]:  
@@ -329,11 +331,20 @@ class LoadImageAndLabels(VisionDataset):  # delete
 
         # get data.yaml info 
         with open(opt.data) as f:
-            data = argparse.Namespace(**yaml.safe_load(f))  # replace
-        src = Path(data.src)
-        nc = data.nc
-        csv_fp = Path(data.src) / 'labels.csv'
-        self.names = data.names
+            opt_data = argparse.Namespace(**yaml.safe_load(f))  # replace
+        
+        src = Path(opt_data.src)
+        nc = len(opt_data.names)
+        csv_fp = Path(opt_data.src) / 'labels.csv'
+        self.names = opt_data.names
+
+        # download if not exist
+        if  not os.path.isdir(opt_data.src) and hasattr(opt_data, 'download')   :
+            download_and_extract_archive(
+                url = opt_data.download,
+                download_root = src.parent ,
+                )
+        
 
         # make pid2cid map from labels.csv
         df = pd.read_csv(csv_fp,converters={0:str,1:int})
@@ -348,7 +359,7 @@ class LoadImageAndLabels(VisionDataset):  # delete
         images = [x for x in files if x.split('.')[-1].lower() in img_formats]
    
         # make info 
-        info = []  # final container
+        info = []  # final valid contariner
         nf,nm,ns,nc = 0,0,0,0
         pbar = tqdm(images)
         for fp in pbar:
@@ -384,7 +395,7 @@ class LoadImageAndLabels(VisionDataset):  # delete
         n = len(self.info)
         self.pixs = [None] * n
 
-        # cache 
+        # make cache 
         if self.cache_images:
             gb=0
             ids = range(n)
