@@ -12,26 +12,10 @@ pip install -r requirements.txt
 
 ## usage
 ``` bash
-python train.py --data cifar10 --epochs 5 --batch 256 --img-size 32 
+python train.py  # try sample
+python train.py --epochs 60 --batch 1024 --img-size 32  # customize 
 ```
-
-## test cases
-``` bash
-python train.py --epochs 3 --batch 256 --img-size 32 --cache
-python train.py --epochs 3 --batch 256 --img-size 32
-python train.py --epochs 3 --batch 256 --img-size 32 --repro
-python train.py --epochs 3 --batch 256 --img-size 32 --kfold 1/5
-python train.py --epochs 3 --batch 256 --img-size 32 --skfold 5/5
-python train.py --epochs 3 --batch 256 --img-size 16 --skfold 5/5
-python train.py --epochs 3 --batch 256 --img-size 16 --skfold 5/5 --workers 2
-python train.py --task test 
-
-python train.py --epochs 3 --batch 256 --img-size 16 --skfold 5/5 --name expexp
-python train.py --epochs 3 --batch 256 --img-size 16 --skfold 5/5 --name expexp --exist-ok
-python train.py --epochs 3 --batch 256 --img-size 16 --skfold 5/5 --name expexp --exist-ok --freeze
-
-
-```
+ 
 
 
 ## p1
