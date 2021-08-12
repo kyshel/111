@@ -42,6 +42,7 @@ jobs:
       
     - name: train.py --project --name 
       run: |
+        echo ${git_hash}123123
         python train.py --project ich_ci --name ${git_hash}_raw 
         
     - name: train.py --cache
