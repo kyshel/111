@@ -33,4 +33,5 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        pytest
+        # pytest
+        python train.py --epochs 3 --batch 256 --img-size 32 --cache
