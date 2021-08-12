@@ -33,12 +33,12 @@ jobs:
     - name: temp
       run: |
 
-        echo ${{ steps.vars.outputs.sha_short }}}_123123
+        echo ${{ steps.vars.outputs.sha_short }}_123123
         
         
     - name: temp2
       run: |
-        echo ${{ steps.vars.outputs.sha_short }}}_456456
+        echo ${{ steps.vars.outputs.sha_short }}_456456
 
 
 
