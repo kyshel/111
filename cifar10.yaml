@@ -31,11 +31,11 @@ src: ./_data/cifar10_png
 # label names (require)
 names: [ 'airplane','automobile','bird','cat','deer','dog','frog','horse','ship','truck']  
 
-# label names count 
+# label names count (Optional)
 nc:   10                 
 
-# download url
-download: https://github.com/kyshel/cifar10/releases/download/v1/cifar10_png.tgz # Optional
+# download url (Optional)
+download: https://github.com/kyshel/cifar10/releases/download/v1/cifar10_png.tgz 
 
-# md5 of zipped 
+# md5 of zipped  (Optional)
 md5: e31365cb0a5f3756b71688b47073b74c

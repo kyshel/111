@@ -32,7 +32,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from tqdm import tqdm
 from torch.optim import lr_scheduler
-import util
+ 
 from utils import ax
 from importlib import reload
 # reload(util)
@@ -41,7 +41,7 @@ from importlib import reload
 import  itertools 
 import sys
 import logging
-from util import increment_path,strip_optimizer,colorstr
+from utils.ax import increment_path,strip_optimizer,colorstr
 from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
 
@@ -333,7 +333,6 @@ else:
     
     
 ### dev section start >>>
-
 # load opt from dev.yaml
 dev_yaml = 'dev.yaml'
 if (not opt.nodev) and (not opt.args) and os.path.isfile(dev_yaml):
@@ -353,8 +352,6 @@ filenames = ['models.py','datasets.py','requirements.txt',]
 for f in filenames:
     if  not os.path.isfile(f):
         raise Exception("Exec in wrong dir! Should exec in repo dir.")
-
-
 ### dev section end <<<
 
 
@@ -371,7 +368,7 @@ if opt.args:
 
 
 # opt init 
-opt_data_fasts = ['cifar10','27bra','cifa2']
+opt_data_fasts = ['cifar10','27bra','cifar2']
 phyzical_cores = psutil.cpu_count(logical = False)
 logical_cores = psutil.cpu_count(logical = True)
 opt.data = f"{opt.data}.yaml" if opt.data in opt_data_fasts else opt.data

@@ -328,10 +328,12 @@ class LoadImageAndLabels(VisionDataset):  # delete
 
         ) -> None:
 
+        prefix = ax.colorstr(prefix)
         split = 'train' if train else 'test'
         self.split = split
         self.cache_images = cache_images
         self.transform = transform
+        
 
         # get data.yaml info 
         with open(opt.data) as f:
