@@ -33,6 +33,9 @@ python train.py --epochs 60 --batch 1024 --img-size 32  # customize
 
 
 ## logs
+- v29 reorginze strucure 
+- v28 add auto cache by dataset property
+- v27 add pretty look
 - v26 add badge 
 - v25 add --task
 - v24 refactor: rename funcs, like pix,cid,fn

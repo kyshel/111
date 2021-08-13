@@ -564,7 +564,7 @@ else:  # create cache
         logger.info("Caching dataset to "+ fp_cache)
         ax.mkdir(Path(fp_cache).parent)
         ax.save_obj([raw_train,raw_test,opt],fp_cache)  
-        logger.info(f'Cached to {fp_cache} {os.path.getsize(fp_cache) / 1E9 :.3f}GB')
+        logger.info(f'Cached to {fp_cache} ({os.path.getsize(fp_cache) / 1E9 :.3f}GB)')
 
 # fold
 names = raw_train.names

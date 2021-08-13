@@ -309,7 +309,7 @@ class Covid(Dataset):
  
 
 
-class LoadImageAndLabels(VisionDataset):  # delete 
+class LoadImageAndLabels(VisionDataset):    
     _repr_indent = 4
 
     def __init__(
