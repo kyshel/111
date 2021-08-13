@@ -681,7 +681,7 @@ writer = SummaryWriter(opt.save_dir)  # Tensorboard
 if not opt.nowandb:
     logger.info("Check is wandb installed ...")
     name_inc = os.path.normpath(opt.save_dir).split(os.path.sep)[-1]
-    wandb = util.wandb
+    wandb = ax.util.wandb
     if wandb:
         logger.info("Wandb login ...")
         is_wandb_login = wandb.login()
