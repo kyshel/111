@@ -1,6 +1,6 @@
 # train.py  
 # %% preset
-
+print('ICH 🚀 v0.1 Igniting ...')
 import psutil
 # import multiprocessing
 from packaging import version
@@ -30,7 +30,7 @@ from torch.utils.data import random_split
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from tqdm import tqdm
+from tqdm import tqdm 
 from torch.optim import lr_scheduler
  
 from utils import ax
@@ -63,6 +63,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.FileHandler('_logger.txt')) 
 
+# device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -329,14 +330,15 @@ if isinteractive(): # not reliable, temp debug only
     
 else:
     opt = parser.parse_args()
-    logger.info(f'[+]mode \nbash ')
+    prefix = colorstr('green','[+]mode')
+    logger.info(f'{prefix} \nbash ')
     
     
 ### dev section start >>>
 # load opt from dev.yaml
-dev_yaml = 'dev.yaml'
+dev_yaml = 'dev.yaml'  
 if (not opt.nodev) and (not opt.args) and os.path.isfile(dev_yaml):
-    logger.info(f'[+]dev.yaml')
+    logger.info( colorstr('bright_magenta', '[+]dev.yaml'  ) )
     with open(dev_yaml) as f:
         args = argparse.Namespace(**yaml.safe_load(f))  # replace
         for k,v in opt.__dict__.items(): # ensure no new args
@@ -354,12 +356,11 @@ for f in filenames:
         raise Exception("Exec in wrong dir! Should exec in repo dir.")
 ### dev section end <<<
 
-
 # opt args  
 if opt.args:
     with open(opt.args) as f:
         args = argparse.Namespace(**yaml.safe_load(f))  # replace
-        logger.info('[+]args \nWarning! Overding args from '+ opt.args)
+        logger.info(colorstr('green','[+]args')+'\nWarning! Overding args from '+ opt.args)
         for k,v in opt.__dict__.items(): # ensure no new args
             if hasattr(args, k):
                 v_overide =  getattr(args, k)  
@@ -376,14 +377,14 @@ opt.nowandb = True if opt.task == 'test' else opt.nowandb
 opt.save_dir = str(increment_path(Path(opt.project) / opt.name,exist_ok=opt.exist_ok))
 opt.workers = logical_cores if opt.workers == 0 else opt.workers
 # task
-logger.info(f'[+]task \n{opt.task}')
+logger.info(colorstr('green','[+]task')+f'\n{opt.task}')
 # proxy
 if opt.proxy:
     if opt.proxy == True:
         proxy_url = "http://127.0.0.1:1080" 
     else:
         proxy_url = opt.proxy
-    print("[+]proxy \nProxy has been set to "+ proxy_url)
+    print(colorstr('green','[+]args')+"[+]proxy \nProxy has been set to "+ proxy_url)
     os.environ['http_proxy'] = proxy_url
     os.environ['https_proxy'] = proxy_url
 # env
@@ -394,7 +395,7 @@ else:
 
 
 # Reproducibility,  NOT work in notebook!
-logger.info('[+]repro')
+logger.info(colorstr('green','[+]repro')+'')
 seed = random.randint(0,9999)
 if opt.repro:
     seed = opt.seed
@@ -455,8 +456,8 @@ last = wdir / 'last.pt'
 best = wdir / 'best.pt'
 results_file = save_dir / 'results.txt'
 logger.addHandler(logging.FileHandler(save_dir / 'logger.txt')) 
-logger.info(f'[+]timestamp \n{TIMESTAMP}')
-logger.info('[+]opt')
+logger.info(colorstr('green','[+]timestamp') + f' \n{TIMESTAMP}')
+logger.info(colorstr('green','[+]opt'))
 logger.info(opt)
 # Save run settings
 # with open(save_dir / 'hyp.yaml', 'w') as f:
@@ -467,7 +468,7 @@ with open(save_dir / 'opt.yaml', 'w') as f:
 
 # gpu  
 if opt.nogpu: device = torch.device('cpu')
-msg = "[+]device \nICH 🚀 v0.1 Using device: {}".format(device) 
+msg = colorstr('green','[+]device')+" \nUsing device: {}".format(device) 
 #Additional Info when using cuda
 if device.type == 'cuda':
     msg = msg + " ["
@@ -502,7 +503,7 @@ transform_test = transforms.Compose([
 
 #%% dataset 
 # dataset
-logger.info('[+]dataset')
+logger.info(colorstr('green','[+]dataset')+' ')
 import datasets
 # cache
 cache_unique = ['data','subset_ratio','img_size',] # args to make cache file unique
@@ -605,7 +606,7 @@ logger.info("Loaded dataset: " + opt.data)
 
 
 # model
-logger.info('[+]model')
+logger.info(colorstr('green','[+]model') )
 pretrained = weights.endswith('.pt')
 if pretrained:
     ckpt = torch.load(weights, map_location=device)  # load checkpoint
@@ -661,7 +662,7 @@ scheduler.last_epoch = start_epoch - 1  # do not move
 
 # test task
 if opt.task == 'test':
-    logger.info('[+]test')
+    logger.info(colorstr('green','[+]test') )
     logger.info('loading best model ')
     # model.load_state_dict(best_model_wts)
     # will error as sliced
@@ -671,7 +672,7 @@ if opt.task == 'test':
     exit()
 
 # visual init
-logger.info('[+]visual')
+logger.info(colorstr('green','[+]visual') )
 # Tensorboard
 prefix = colorstr('tensorboard: ')
 logger.info(f"{prefix}Start with 'tensorboard --logdir {opt.project}', view at http://localhost:6006/")
@@ -681,7 +682,7 @@ writer = SummaryWriter(opt.save_dir)  # Tensorboard
 if not opt.nowandb:
     logger.info("Check is wandb installed ...")
     name_inc = os.path.normpath(opt.save_dir).split(os.path.sep)[-1]
-    wandb = ax.util.wandb
+    wandb = ax.wandb
     if wandb:
         logger.info("Wandb login ...")
         is_wandb_login = wandb.login()
@@ -720,7 +721,7 @@ plot_cls_bar(raw_train.labels, save_dir, raw_train)
 # writer.add_histogram('raw_test_labels', torch.tensor(raw_test.labels), 1)
 
 # visual info 
-logger.info("[+]info")
+logger.info(colorstr('green','[+]info') )
 dataset_msg = 'No msg'
 if opt.kfold:
     dataset_msg = "Kfold: " + opt.kfold
@@ -747,7 +748,7 @@ if opt.inspect:
 
 
 # Start Training >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-logger.info('[+]train')
+logger.info(colorstr('green','[+]train') )
 logger.info('Logging results to ' + str(save_dir))
 logger.info('Starting training for {} epochs...'.format(epochs))
 best_model_wts = copy.deepcopy(model.state_dict())
@@ -878,7 +879,7 @@ logger.info('End Train!')
 
 
 # %% test
-logger.info('[+]test')
+logger.info(colorstr('green','[+]test') )
 logger.info('loading best model ')
 model.load_state_dict(best_model_wts)
 # will error as sliced
