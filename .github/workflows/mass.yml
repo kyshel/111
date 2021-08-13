@@ -79,5 +79,36 @@ jobs:
       run: |
         python train.py --subset 0.02 --data cifar10  \
         --project ich_ci --cache cache_cifar10_subset.pkl --repro --skfold 4/5 --name ${{ steps.vars.outputs.sha_short }}_8subset
-         
+     
+    - name: 9 train.py --cache auto  
+      run: |
+        python train.py --cache auto \
+        --subset 0.8 --data cifar2  \
+        --project ich_ci --cache cache_cifar10_subset.pkl --repro --skfold 4/5 --name ${{ steps.vars.outputs.sha_short }}_8subset
+     
+        
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
+     
         
