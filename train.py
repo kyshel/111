@@ -1,6 +1,7 @@
-# train.py  
+# ICH train.py  
 # %% preset
 print('ICH 🚀 v0.1 Igniting ...')
+
 import psutil
 # import multiprocessing
 from packaging import version
@@ -60,6 +61,7 @@ logging.basicConfig(
         ]
     )
 logger = logging.getLogger(__name__)
+ax.mkdir('_log')
 logger.addHandler(logging.FileHandler('_log/logger.txt')) 
 
 # device
