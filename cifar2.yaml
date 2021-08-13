@@ -26,7 +26,7 @@
 
 
 # dataset source dir (require)
-src: ./_tmp/cifar2_png      
+src: ./_data/cifar2_png      
 
 # label names (require)
 names: [ '0automobile','1horse']  

@@ -508,7 +508,11 @@ transform_test = transforms.Compose([
 logger.info('[+]dataset')
 import datasets
 # cache
+cache_unique = ['data','subset_ratio','img_size',] # args to make cache file unique
 fp_cache = str(opt.cache)
+if fp_cache == 'auto':
+    base_fn = '_'.join([str(getattr(opt,x)) for x in cache_unique])
+    fp_cache = f'_cache/{base_fn}.pkl' #  
 sid2cat_csvfp = '../00raw/train_study_level.csv' # custom
 if opt.cov_rawdir: ### custom, need rm in lts
     sid2cat_csvfp = str(Path(str(opt.cov_rawdir)) / 'train_study_level.csv')
@@ -521,8 +525,8 @@ if str(fp_cache).endswith('.pkl') and os.path.isfile(fp_cache):
     except Exception as e:
         raise Exception(str(e) + "\nError occured, try without --cache")
     # check 
-    checklist = ['img_size','data','subset_ratio']
-    for arg in checklist:
+    
+    for arg in cache_unique:
         want_arg = getattr(opt,arg)
         cached_arg = getattr(cached_opt,arg)
         assert want_arg == cached_arg , \

@@ -347,6 +347,7 @@ class LoadImageAndLabels(VisionDataset):  # delete
             download_and_extract_archive(
                 url = opt_data.download,
                 download_root = src.parent ,
+                md5 = opt_data.md5 if hasattr(opt_data, 'md5') else None,
                 )
         
 
