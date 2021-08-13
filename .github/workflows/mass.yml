@@ -43,37 +43,41 @@ jobs:
       run: |
         wandb login ${{ secrets.WANDB }}
       
-    - name: train.py --project --name 
+    - name: 1 train.py --project --name   
       run: |
         python train.py --project ich_ci --name ${{ steps.vars.outputs.sha_short }}_1raw 
         
-    - name: train.py --cache
+    - name: 2 train.py --cache
       run: |
         python train.py --project ich_ci --cache cache.pkl --name ${{ steps.vars.outputs.sha_short }}_2cache
         
     
-    - name: train.py --kfold
+    - name: 3 train.py --kfold
       run: |
         python train.py --project ich_ci --cache cache.pkl --repro --kfold 2/5 --name ${{ steps.vars.outputs.sha_short }}_3kfold
         
-    - name: train.py --kfold
+    - name: 4 train.py --kfold
       run: |
         python train.py --project ich_ci --cache cache.pkl --repro --skfold 3/5 --name ${{ steps.vars.outputs.sha_short }}_4skfold
         
-    - name: train.py --repro1  # put repro to the end to ensure all args worked
+    - name: 5 train.py --repro1  # put repro to the end to ensure all args worked
       run: |
         python train.py --project ich_ci --cache cache.pkl --repro --skfold 4/5 --name ${{ steps.vars.outputs.sha_short }}_5repro1
         
-    - name: train.py --repro2  
+    - name: 6 train.py --repro2  
       run: |
         python train.py --project ich_ci --cache cache.pkl --repro --skfold 4/5 --name ${{ steps.vars.outputs.sha_short }}_6repro2
         
         
-    - name: train.py --task tset
+    - name: 7 train.py --task tset
       run: |
         python train.py --project ich_ci --cache cache.pkl \
         --task test --weights ich_ci/${{ steps.vars.outputs.sha_short }}_4skfold/weights/best.strip.pt \
         --name ${{ steps.vars.outputs.sha_short }}_7test
      
-      
+    - name: 8 train.py --subset  
+      run: |
+        python train.py --subset 0.02 --data cifar10  \
+        --project ich_ci --cache cache_cifar10_subset.pkl --repro --skfold 4/5 --name ${{ steps.vars.outputs.sha_short }}_8subset
+         
         
