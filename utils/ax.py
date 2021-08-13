@@ -9,7 +9,8 @@ from pathlib import Path
 import time
 import glob
 import re 
-
+import math
+from decimal import Decimal
 
 os.environ['TZ'] = 'Asia/Shanghai'
 time.tzset()
@@ -19,6 +20,12 @@ time.tzset()
 
  
 
+def get_stratified(inputs,ratio): # list, float  
+    magnitude = math.floor(math.log(len(inputs), 10))  # Ex: 10 > 1, 100 > 2
+    margin_ratio = str(round(float(ratio), magnitude))
+    numerator, denominator = Decimal(margin_ratio).as_integer_ratio()
+    # print(numerator,denominator)
+    return [v for i,v in enumerate(inputs) if i % denominator < numerator]
 
 
 

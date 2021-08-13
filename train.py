@@ -33,7 +33,7 @@ import torch.optim as optim
 from tqdm import tqdm
 from torch.optim import lr_scheduler
 import util
-import ax
+from utils import ax
 from importlib import reload
 # reload(util)
 # reload(ax)
@@ -314,6 +314,7 @@ parser.add_argument('--batch', type=int, default=256, help='total batch size for
 parser.add_argument('--epochs', type=int, default=3)
 parser.add_argument('--nodev', action='store_true', help='only save final checkpoint')
 parser.add_argument('--nogpu', action='store_true', help='only save final checkpoint')
+parser.add_argument('--subset-ratio',type=str,   default='0', help='ratio of sub-trainset and sub-testset')
 
 # custom
 parser.add_argument('--cov_rawdir',nargs='?', const=True, default=False, help='resume most recent training')
@@ -509,7 +510,7 @@ import datasets
 # cache
 fp_cache = str(opt.cache)
 sid2cat_csvfp = '../00raw/train_study_level.csv' # custom
-if opt.cov_rawdir: # custom, need rm in lts
+if opt.cov_rawdir: ### custom, need rm in lts
     sid2cat_csvfp = str(Path(str(opt.cov_rawdir)) / 'train_study_level.csv')
 if str(fp_cache).endswith('.pkl') and os.path.isfile(fp_cache): 
     # use cache
@@ -520,7 +521,7 @@ if str(fp_cache).endswith('.pkl') and os.path.isfile(fp_cache):
     except Exception as e:
         raise Exception(str(e) + "\nError occured, try without --cache")
     # check 
-    checklist = ['img_size','data']
+    checklist = ['img_size','data','subset_ratio']
     for arg in checklist:
         want_arg = getattr(opt,arg)
         cached_arg = getattr(cached_opt,arg)
@@ -538,25 +539,21 @@ else:  # create cache
 
     raw_train = rawset(
         opt,
-        # root= opt.raw_train_root if opt.raw_train_root else '../03png/train' , 
-        # obj = '../11data/train_imginfo.obj',
-        # csv = sid2cat_csvfp,
         train=True,
         transform=transform_train,
         cache_images = opt.cache,
         prefix = 'raw_train:',
         workers = opt.workers,
+        subset_ratio = float(opt.subset_ratio) if opt.subset_ratio != '0' else None,
         )
     raw_test = rawset(
         opt,
-        # root= opt.raw_test_root if opt.raw_test_root else '../03png/test', 
-        # obj = '../11data/test_imginfo.obj',
-        # csv = sid2cat_csvfp,
         train=False,                    
         transform=transform_test,
         cache_images = opt.cache,
         prefix = 'raw_test:',
         workers = opt.workers,
+        subset_ratio =float(opt.subset_ratio) if opt.subset_ratio != '0' else None,
         )
 
     # save cache

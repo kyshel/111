@@ -12,7 +12,7 @@ from torchvision import models
 import os 
 import numpy as np
 from typing import Any, Callable, Optional, Tuple
-import ax
+from utils import ax
 from PIL import Image, ExifTags
 from torch.utils.data import Dataset
 import pandas as pd
@@ -324,6 +324,7 @@ class LoadImageAndLabels(VisionDataset):  # delete
             prefix ='',
             workers = 8,
             cache_images = None, 
+            subset_ratio = None, # float, subset ratio for dataset
 
         ) -> None:
 
@@ -360,6 +361,12 @@ class LoadImageAndLabels(VisionDataset):  # delete
         files = {}
         files = sorted(glob.glob( str(src / split / '*')  ))
         images = [x for x in files if x.split('.')[-1].lower() in img_formats]
+
+        # subset
+        if subset_ratio is not None: 
+            origin_len = len(images)
+            images = ax.get_stratified(images,subset_ratio) 
+            logger.info(f'{prefix}subset_ratio is {subset_ratio}, cut length from {origin_len} to {len(images)} ')
    
         # make info 
         info = []  # final valid contariner
