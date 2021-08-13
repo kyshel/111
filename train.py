@@ -56,12 +56,11 @@ logging.basicConfig(
         format="%(message)s",
         level=logging.INFO,
         handlers=[
-            # logging.FileHandler(save_dir / 'logger.txt'), # should get dir after 
             logging.StreamHandler()
         ]
     )
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.FileHandler('_logger.txt')) 
+logger.addHandler(logging.FileHandler('_log/logger.txt')) 
 
 # device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -534,10 +533,10 @@ if str(fp_cache).endswith('.pkl') and os.path.isfile(fp_cache):
                 cached_arg,
             ) 
 else:  # create cache
-    if opt.data.endswith('.yaml'): # load dataset by yaml 
+    if opt.data.endswith('.yaml'): # load dataset by yaml file
         rawset = datasets.LoadImageAndLabels
-    else:                          #  load dataset by name
-        rawset = getattr(datasets, opt.data)  # manual build  
+    else:                          #  load dataset by class name
+        rawset = getattr(datasets, opt.data)   
 
     raw_train = rawset(
         opt,
@@ -563,6 +562,7 @@ else:  # create cache
         logger.info("Caching dataset to "+ fp_cache)
         ax.mkdir(Path(fp_cache).parent)
         ax.save_obj([raw_train,raw_test,opt],fp_cache)  
+        logger.info(f'Cached to {fp_cache} {os.path.getsize(fp_cache) / 1E9 :.3f}GB')
 
 # fold
 names = raw_train.names
@@ -686,6 +686,9 @@ if not opt.nowandb:
     if wandb:
         logger.info("Wandb login ...")
         is_wandb_login = wandb.login()
+
+        wandb_dir = './_wandb'
+        ax.mkdir(wandb_dir)
         # init wandb               
         wandb.init(
             # Set entity to specify your username or team name
@@ -698,6 +701,7 @@ if not opt.nowandb:
             name=name_inc,
             resume="allow",
             tags = ["explorer"],
+            dir = wandb_dir
         )
     else:
         logger.info('Wandb not installed, manual install: pip install wandb')
