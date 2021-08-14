@@ -13,8 +13,11 @@ pip install -r requirements.txt
 
 ## usage
 ``` bash
-python train.py  # try sample
-python train.py --epochs 60 --batch 1024 --img-size 32  # customize 
+# try sample without args
+python train.py  
+
+# customize args
+python train.py --data cifar10 --subset 0.1 --epochs 60 --batch 1024 --img-size 32  
 ```
  
 
@@ -33,7 +36,7 @@ python train.py --epochs 60 --batch 1024 --img-size 32  # customize
 
 
 ## logs
-- v29 reorginze strucure 
+- v29 reorganize strucure 
 - v28 add auto cache by dataset property
 - v27 add pretty look
 - v26 add badge 

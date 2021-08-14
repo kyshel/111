@@ -1,5 +1,10 @@
 
 
+# meme
+- transform before cache: improve traning efficiency, lose cache flexibility, 
+
+
+
 
 
 # ich doc

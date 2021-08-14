@@ -372,7 +372,7 @@ class LoadImageAndLabels(VisionDataset):
             logger.info(f'{prefix}subset_ratio is {subset_ratio}, cut length from {origin_len} to {len(images)} ')
    
         # make info 
-        info = []  # final valid contariner
+        info = []  # final valid container
         nf,nm,nc = 0,0,0
         pbar = tqdm(images)
         for fp in pbar:
