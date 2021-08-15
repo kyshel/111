@@ -16,7 +16,8 @@ import glob
 import re
 import torch  # no need repro cause only save here
 import os
-
+from tqdm import tqdm
+import shutil
 
 os.environ['TZ'] = 'Asia/Shanghai'
 time.tzset()
@@ -121,6 +122,12 @@ def nowtime(style = 0):
 
 def mkdir(fp):
   Path(fp).mkdir(parents=True, exist_ok=True)
+
+def clean_dir(dir_name ):
+    fp_list = glob.glob(  os.path.join(dir_name,'*')) + glob.glob(os.path.join(dir_name,'.*')) 
+    for f in tqdm( fp_list, desc=f"Cleaning {dir_name}"  ) :
+        # os.remove(f)
+        shutil.rmtree(f)
 
 
 def get_fp_list(dir_name,ext = None):

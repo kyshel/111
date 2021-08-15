@@ -442,7 +442,7 @@ class LoadImageAndLabels(VisionDataset):
     def load_pix(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
-        pix = Image.open(self.paths[idx]).convert('RGB')
+        pix = Image.open(self.paths[idx]).convert('RGB') # 1c to 3c 
         if self.transform: pix = self.transform(pix)
         return pix  
 

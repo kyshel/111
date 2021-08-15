@@ -22,6 +22,7 @@ import matplotlib
 from importlib import reload
 import glob 
 import os 
+from multiprocessing.pool import ThreadPool
 
 reload(matplotlib)
 matplotlib.style.use('dark_background')
@@ -126,16 +127,33 @@ def dcm2pix(dcm):
     # hist(uni_dot)
 
     return raw,raw_cut,uni_cut,raw_dot,uni_dot
+
+
+def pix2file(pix,dst_fp,do_norm = False,is_norm = False):
+    if do_norm and is_norm: raise Exception('do_norm and is_norm can not co-exist')
+    if do_norm: pix = (norm(pix) * 255).astype(np.uint8)
+    if is_norm: pix = (pix* 255).astype(np.uint8)
  
-def seepix(pix,is_norm = False): 
-    if is_norm: pix = (norm(pix) * 255).astype(np.uint8)
+    im = Image.fromarray(pix) # np > im
+    im.save(dst_fp)
+
+
+
+ 
+
+
+def seepix(pix,do_norm = False): 
+    if do_norm: pix = (norm(pix) * 255).astype(np.uint8)
     im = Image.fromarray(pix) # np > im 
     im.show()
 
 def norm(pix):
     return pix / pix.max()
 
-def dcms2pie(dcms_fp): 
+def dcms2pie(dcms_fp,dst_fp = None,pbar=None): 
+    if 'HALT' in vars() or 'HALT' in globals(): # stop multi-threads
+        if HALT: return 
+
     dcm_files = sorted(
                 glob.glob(os.path.join(dcms_fp,"*.dcm")), 
                 key=lambda x: int(x[:-4].split("-")[-1]),
@@ -149,60 +167,119 @@ def dcms2pie(dcms_fp):
         
         pie += raw  # must raw here, 1 pie should has same scale 
 
+    if dst_fp is not None: # make file
+        pix2file(pie,dst_fp,do_norm=True) 
+
+    if pbar:
+        pbar.update(1)
 
     return pie
 
 
-#%% load dicom 
- 
-fp = '/ap/27bra/01raw/d/train/00000/T1wCE/Image-78.dcm'
-fp = '/ap/27bra/01raw/d/train/00000/FLAIR/Image-50.dcm'
-raw,raw_cut,uni_cut,raw_dot,uni_dot = dcm2pix(fp)
-print(raw)
-# w = 64 ; mesh(raw,(w,w))
-
-# dcms2spie
-pie = dcms2pie('/ap/27bra/01raw/d/train/00000/FLAIR')
-# # w = 64 ; mesh(norm(pix),(w,w))
- 
 #%% make pies
 
+from utils import ax
+reload(ax)
+import shutil
+from tqdm import tqdm 
+import multiprocessing.dummy as mp 
+from itertools import repeat
 
-def make_pies():
-    input_dir = '/ap/27bra/01raw/d/'
-    split = ['train','test']
+def make_pies(input_dir,dst_dir,labels_csv_name = 'train_labels.csv',workers = 16):
     cohorts = ['FLAIR' , 'T1w' , 'T1wCE' , 'T2w']
 
-    pie_dirs = []
+    # dcms_dirs
+    dcms_dirs = []
     for split in 'train','test':
         case_dirs = [ f.path for f in os.scandir(os.path.join(input_dir,split)) if f.is_dir() ]
         for case_dir in case_dirs:
             for cohort in cohorts:
 
                 pie_dir = os.path.join(case_dir,cohort)
-                pie_dirs += [pie_dir]
+                dcms_dirs += [pie_dir]
+
+    # mkdir and prepare labels.csv
+    for c in cohorts:
+        for split in 'train','test':
+            ax.mkdir(os.path.join(dst_dir,c,split))
+        csv_src = os.path.join(input_dir,labels_csv_name)
+        csv_dst = os.path.join(dst_dir,c,'labels.csv')
+        shutil.copy2(csv_src,csv_dst) # cp
+            
+    # dst_files
+    dcms_dirs = sorted(dcms_dirs)
+    dst_files = []
+    for p in dcms_dirs:
+        segs = p.split(os.sep)  # [...,'01raw', 'd', 'train', '00466', 'FLAIR']
+        # print(segs)
+        cohort = segs[-1]
+        split =  segs[-3]
+        fn = f'{segs[-2]}.png'
+        dst_fp = os.path.join(dst_dir,cohort,split,fn)
+        # print(p,dst_fp)
+        dst_files += [dst_fp]
+        
+
+    # print(dcms_dirs[2],dst_files[2])
+    # dcms2pie(dcms_dirs[2],dst_files[2]) # pie need norm 
+
+    # print(dcms_dirs,dst_files)
+
+    # make pies
+    # gb=0
+    # results = ThreadPool(workers).imap(dcms2pie,   zip(dcms_dirs, dst_files   )) 
+    # pbar = tqdm(enumerate(results) , mininterval=1,)
+    # for i, x in pbar:
+    #     # gb += self.pixs[i].nbytes # sys.getsizeof(b.storage())
+    #     gb +=  x.nbytes
+    #     pbar.desc = f' Cooking pies ({gb / 1E9:.1f}GB)'
+    # pbar.close()
+
+    # make pies
+    pbar = tqdm(total=len(dcms_dirs), position=0, leave=True,
+              desc = f"dcms2pie, {input_dir} > {dst_dir}: ",
+                bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}')
+    p=mp.Pool(workers)
+    p.starmap(dcms2pie, zip(dcms_dirs, dst_files,repeat(pbar)))
+    p.close()
+    pbar.close()
+    p.join()
 
 
-    for p in pie_dirs:
-        print(p)
-        pie = dcms2pie(p)
 
 
+# make_pies(input_dir,dst_dir,workers=16)
 
 
-# seepix(pie,1)
-
-    # print(len(pie_dirs))
-    # print(pie_dirs)
-
-
-make_pies()
+input_dir = '/ap/27bra/01raw/d/'
+dst_dir = '/ap/27bra/03png_pie2'
+# make_pies(input_dir,dst_dir,workers=16)
 
 
 
 
 
+HALT = False
+# ax.clean_dir(dst_dir)
+try:
+    make_pies(input_dir,dst_dir,workers=16)
+except KeyboardInterrupt:
+    HALT = True
+    raise
 
+
+
+#%% lab: load dicom 
+ 
+fp = '/ap/27bra/01raw/d/train/00000/T1wCE/Image-78.dcm'
+fp = '/ap/27bra/01raw/d/train/00000/FLAIR/Image-50.dcm'
+raw,raw_cut,uni_cut,raw_dot,uni_dot = dcm2pix(fp)
+print(raw)
+# w = 64 ; mesh(raw,(w,w))
+# dcms2spie
+pie = dcms2pie('/ap/27bra/01raw/d/train/00000/FLAIR')
+# # w = 64 ; mesh(norm(pix),(w,w))
+ 
 # %% lab: resize will decay max 
 row = 4
 row2 = 2
@@ -215,6 +292,27 @@ a , a_dot, a_resized, a_dot_resized
 
 # %%
 mesh(raw,(128,128))
+
+
+
+# %% lena  pix2file
+import png
+def pix2file(pix,dst_fp,do_norm = False,is_norm = False):
+    if do_norm and is_norm: raise Exception('do_norm and is_norm can not co-exist')
+    if do_norm: pix = (norm(pix) * 255).astype(np.uint8)
+    if is_norm: pix = (pix* 255).astype(np.uint8)
+ 
+    im = Image.fromarray(pix) # np > im
+    im.save(dst_fp)
+
+
+fp = 'lena.png'
+im = Image.open(fp) 
+im_gray = im.convert('RGB') 
+pix_gray = np.array(im_gray) 
+
+pix2file(pix_gray,'lena_rm2.png')
+
 
 # %% mesh lena 
 
@@ -233,7 +331,7 @@ mesh(pix,(512,512))
 mesh(pix_32)
 
 
-
+raise # cut
  
 
 
