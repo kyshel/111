@@ -32,6 +32,7 @@ pie ok
 
 # p9
 - png 3 channel sample, view the tumor range 
+- try directly crop little 
 - chop edges very high
 - unify all the pic direction 
 - try 3 slice technique
