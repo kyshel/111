@@ -2,33 +2,260 @@
 # type: ignore
 # flake8: noqa
 
+#%% func  444
+
+%matplotlib inline
+import pydicom  
+from pydicom.pixel_data_handlers.util import apply_voi_lut
+import numpy as np 
+from PIL import Image
+from pathlib import Path
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+import torchvision.transforms as T
+from PIL import Image
+import numpy as np
+import ipyvolume as ipv
+import numpy as np
+import matplotlib
+from importlib import reload
+import glob 
+import os 
+
+reload(matplotlib)
+matplotlib.style.use('dark_background')
+
+def c1to3(a):
+    return  np.repeat(np.expand_dims(a, axis=2),3,axis = 2)
+
+def c3to1(pix):
+    return pix[:,:,0]
+
+def rot270(a):
+    return np.rot90(np.rot90(np.rot90(a)))
+
+def rot180(a):
+    return np.rot90(np.rot90(a))
+
+def rot90(a):
+    return  np.rot90(a)    
+
+def rot0(a):
+    return a
+
+def resize(im_np,size):
+    return np.asarray(T.Resize(size=size)(Image.fromarray(im_np)))
+
+def gray_rm(im_np):
+    return np.asarray(T.Grayscale()(Image.fromarray(im_np)))
+
+def gray_rm(im_np):
+    return np.asarray( Image.fromarray(im_np).convert('L')  )
+
+def gray(im_np,is_round = False):
+    if im_np.ndim == 2:
+        return  im_np
+    else:
+        im2 =np.zeros([im_np.shape[0],im_np.shape[1]])
+        for i,r in enumerate(im_np):
+            for j,v in enumerate(r):
+                # R * 299/1000 + G * 587/1000 + B * 114/1000
+                im2[i][j] = v[0]* 299/1000 + v[1]* 587/1000 + v[2]* 114/1000 
+                if   is_round :  im2[i][j]  = round(im2[i][j]  )
+        return  im2
+
+def hist(input_2d,bins = 'auto'):
+    y, x = np.histogram(input_2d.ravel(), bins=bins)
+    fig, ax = plt.subplots()
+    ax.plot(x[:-1], y)
+    fig.show()
+    plt.show()
+
+def mesh(pix_input,size = None):
+    # show mesh, pix gray must 1 channel
+    if size is None: size = pix_input.shape[0] , pix_input.shape[1]
+
+    # print(pix_input.max())
+    pix = resize(pix_input,size)
+    # print(pix.max())  # will decay
+
+    a = np.arange(0, pix.shape[0])
+    X, Y = np.meshgrid(a, a)
+    Z = rot270(gray(pix))   # surface, 1 channel
+    # Z = rot270( pix )
+
+    deno = pix.max() - pix.min()
+    c = rot270(c1to3(pix) if pix.ndim == 2 else pix)/deno     # color , 3 channel 
+
+
+    ipv.figure()
+    
+    # mesh = ipv.plot_mesh(Y,X,Z,    wireframe=True,color=c )
+    ipv.plot_wireframe(Y,X,Z, color=c)
+    ipv.show()
+    ipv.style.set_style_dark()
+
+
+def dcm2pix(dcm):
+    # has bug, max may == 0
+    dicom = pydicom.read_file(dcm)
+    raw = dicom.pixel_array
+    lut = apply_voi_lut(raw, dicom)   
+    uni = np.amax(lut) - lut  if dicom.PhotometricInterpretation == "MONOCHROME1" else lut
+
+    raw_cut = raw - np.min(raw)
+    uni_cut = uni - np.min(uni)
+
+    # raw_cut_max = 0.000001 if np.max(raw_cut) == 0 else np.max(raw_cut)
+    # uni_cut_max = 0.000001 if np.max(raw_cut) == 0 else np.max(raw_cut)
+
+    raw_dot = raw_cut / np.max(raw_cut)
+    uni_dot = uni_cut / np.max(uni_cut)
+
+    # print(f'raw: min {raw.min(): <8} max {raw.max(): <8}')
+    # print(f'raw_cut: min {raw_cut.min(): <8} max {raw_cut.max(): <8}')
+    # print(f'uni_cut: min {uni_cut.min(): <8} max {uni_cut.max(): <8}')
+    # print(f'raw_dot: min {raw_dot.min(): <8} max {raw_dot.max(): <8}')
+    # print(f'uni_dot: min {uni_dot.min(): <8} max {uni_dot.max(): <8}')
+
+    # hist(raw)
+    # hist(raw_cut)
+    # hist(uni_cut)
+    # hist(raw_dot)
+    # hist(uni_dot)
+
+    return raw,raw_cut,uni_cut,raw_dot,uni_dot
+ 
+def seepix(pix,is_norm = False): 
+    if is_norm: pix = (norm(pix) * 255).astype(np.uint8)
+    im = Image.fromarray(pix) # np > im 
+    im.show()
+
+def norm(pix):
+    return pix / pix.max()
+
+def dcms2pie(dcms_fp): 
+    dcm_files = sorted(
+                glob.glob(os.path.join(dcms_fp,"*.dcm")), 
+                key=lambda x: int(x[:-4].split("-")[-1]),
+            )
+
+    raw,raw_cut,uni_cut,raw_dot,uni_dot = dcm2pix(dcm_files[0])
+    
+    pie = np.zeros(raw.shape)
+    for f in dcm_files:
+        raw,raw_cut,uni_cut,raw_dot,uni_dot = dcm2pix(f)
+        
+        pie += raw  # must raw here, 1 pie should has same scale 
+
+
+    return pie
+
+
+#%% load dicom 
+ 
+fp = '/ap/27bra/01raw/d/train/00000/T1wCE/Image-78.dcm'
+fp = '/ap/27bra/01raw/d/train/00000/FLAIR/Image-50.dcm'
+raw,raw_cut,uni_cut,raw_dot,uni_dot = dcm2pix(fp)
+print(raw)
+# w = 64 ; mesh(raw,(w,w))
+
+# dcms2spie
+pie = dcms2pie('/ap/27bra/01raw/d/train/00000/FLAIR')
+# # w = 64 ; mesh(norm(pix),(w,w))
+ 
+#%% make pies
+
+
+def make_pies():
+    input_dir = '/ap/27bra/01raw/d/'
+    split = ['train','test']
+    cohorts = ['FLAIR' , 'T1w' , 'T1wCE' , 'T2w']
+
+    pie_dirs = []
+    for split in 'train','test':
+        case_dirs = [ f.path for f in os.scandir(os.path.join(input_dir,split)) if f.is_dir() ]
+        for case_dir in case_dirs:
+            for cohort in cohorts:
+
+                pie_dir = os.path.join(case_dir,cohort)
+                pie_dirs += [pie_dir]
+
+
+    for p in pie_dirs:
+        print(p)
+        pie = dcms2pie(p)
+
+
+
+
+# seepix(pie,1)
+
+    # print(len(pie_dirs))
+    # print(pie_dirs)
+
+
+make_pies()
 
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# %% lab: resize will decay max 
+row = 4
+row2 = 2
+a = np.arange(row*row).reshape(row,row).astype(np.uint8)
+a_resized  = resize(a,(row2,row2))
+# a = np.linspace(0,1,row*row).reshape(row,row)   #.astype(np.uint8)
+a_dot = a / np.max(a)
+a_dot_resized = resize(a_dot,(row2,row2))
+a , a_dot, a_resized, a_dot_resized
 
 # %%
-print(1)
+mesh(raw,(128,128))
+
+# %% mesh lena 
+
+fp = 'lena.png'
+im = Image.open(fp) 
+im_gray = im.convert('L') 
+pix = np.array(im)                 #  rgb  3c
+pix_gray = np.array(im_gray)           # gray 1c
+pix_32 = np.array(im.resize([32,32]))    
+
+# width = 32
+# mesh(pix_gray,(width,width))
+# mesh(pix,(width,width))
+
+mesh(pix,(512,512))
+mesh(pix_32)
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # %%    3d plot surface     >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # preset 
@@ -41,6 +268,9 @@ matplotlib.style.use('dark_background')
 def c1to3(a):
     return  np.repeat(np.expand_dims(a, axis=2),3,axis = 2)
 
+
+# %%
+print(1)
 
 #%% im
 from PIL import Image
