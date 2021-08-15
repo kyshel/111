@@ -2,15 +2,168 @@
 # type: ignore
 # flake8: noqa
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # %%
+print(1)
+
+# %%    3d plot surface     >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+# preset 
+%matplotlib inline
+import matplotlib
+from importlib import reload
+reload(matplotlib)
+matplotlib.style.use('dark_background')
+
+def c1to3(a):
+    return  np.repeat(np.expand_dims(a, axis=2),3,axis = 2)
+
+
+#%% im
+from PIL import Image
+import numpy as np
+
+
+dim = 128
+plot_shape = (dim,dim) # w, h
+
+fp = 'lena.png'
+im_raw = Image.open(fp) 
+im = im_raw.convert('L').resize(plot_shape)
+# im.show()
+
+pix = np.array(im)   # gray
+print(pix.shape)
+
+im2 = im.convert('RGB')
+pix2 = np.array(im2)  # gray 3c
+
+pix3 = np.array(im_raw.resize(plot_shape))   #  rgb 
+
+#%% plot 
+import ipyvolume as ipv
+import numpy as np
+ 
+a = np.arange(0, pix.shape[0])
+U, V = np.meshgrid(a, a)
+X = U
+Y = V
+Z = pix
+
+ipv.figure()
+# ipv.plot_surface(X,Y, Z, color=pix2/255)
+# ipv.plot_mesh(X,Y, Z, color=pix3/255, wireframe=True)
+ipv.plot_wireframe(X, Y,  Z, color=pix3/255)
+ipv.show()
+
+ipv.style.set_style_dark()
+ipv.view(azimuth=0, elevation=0, distance=10)
+
+
+# ipv.style.use('black')
+# ipv.style.background_color('black')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#%%
+ipv.view(azimuth=180, elevation=0, distance=5)
+
+
+
+
+
+
+#%% 1 channel to 3 channel 
+# np.repeat(  [[0,1],[1,2]], 3 , axis = np.newaxis )
+
+def c1to3(a):
+    return  np.repeat(np.expand_dims(a, axis=2),3,axis = 2)
+
+a = np.array([[1,2],[3,4]])
+b = c1to3(a)
+
+a ,   b   ,  a.shape,   b.shape
+
+# %% PIL load image
+from PIL import Image
+import numpy as np
+plot_shape = (128,128) # w, h
+
+fp = 'lena.png'
+im = Image.open(fp).convert('L')
+im = im.resize(plot_shape)
+im.show()
+
+pix = np.array(im)
+print(pix.shape)
+
+
+
+import ipyvolume as ipv
+import numpy as np
+ 
+a = np.arange(0, pix.shape[0]-1)
+U, V = np.meshgrid(a, a)
+X = U
+Y = V
+Z = pix
+
+
+ 
+ipv.figure()
+ipv.plot_surface(X, Z, Y, color="gray")
+# ipv.plot_wireframe(X, Z, Y, color="green")
+ipv.show()
+ipv.style.set_style_dark()
+
+
+
+
+
+# %% show surface plot
 
 from mpl_toolkits import mplot3d
 import numpy as np
+ 
 import matplotlib.pyplot as plt
-x = np.outer(np.linspace(0, 255, 256), np.ones(256))
+x = np.outer(np.linspace(0, plot_shape[0]-1, plot_shape[0]), np.ones(plot_shape[0]))
 y = x.copy().T # transpose
 # z = np.cos(x ** 2 + y ** 2)
-z = x**2 + y**2
+z = pix
 
 
 
@@ -26,39 +179,78 @@ plt.show()
 
 
 
+# %% set ipv
+import ipyvolume as ipv
+import numpy as np
+
+# reload(ipv)
+# ipv.style.use('dark')
+
+# f(u, v) -> (u, v, u*v**2)
+a = np.arange(0, pix.shape[0]-1)
+U, V = np.meshgrid(a, a)
+X = U
+Y = V
+Z = pix
+
+
+ 
+ipv.figure()
+ipv.plot_surface(X, Z, Y, color="orange")
+ipv.plot_wireframe(X, Z, Y, color="red")
+ipv.show()
+ipv.style.set_style_dark()
 
 
 
 
+#%%
+
+
+s = 1/2**0.5
+# 4 vertices for the tetrahedron
+x = np.array([1.,  -1, 0,  0])
+y = np.array([0,   0, 1., -1])
+z = np.array([-s, -s, s,  s])
+# and 4 surfaces (triangles), where the number refer to the vertex index
+triangles = [(0, 1, 2), (0, 1, 3), (0, 2, 3), (1,3,2)]
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+ipv.figure()
+# we draw the tetrahedron
+mesh = ipv.plot_trisurf(x, y, z, triangles=triangles, color='orange')
+# and also mark the vertices
+ipv.scatter(x, y, z, marker='sphere', color='blue')
+ipv.xyzlim(-2, 2)
+ipv.show()
+# %%
 
 # %%
+
+
+
+
+
+# %% ipywidgets slider  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+import ipywidgets as widgets
+
+out = widgets.Output()
+def on_value_change(change):
+    with out:
+        print(change['new'])
+
+slider = widgets.IntSlider(min=1, max=100, step=1, continuous_update=True)
+play = widgets.Play(min=1, interval=2000)
+
+slider.observe(on_value_change, 'value')
+widgets.jslink((play, 'value'), (slider, 'value'))
+widgets.VBox([play, slider, out])
+
+
+ 
+# %%  plot3D            >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> 
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import numpy as np
