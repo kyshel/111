@@ -1,6 +1,6 @@
 # ICH train.py  
 # %% preset
-print('ICH 🚀 v0.1 Igniting ...')
+print('ICH 🔥 v0.1 Igniting ...')
 
 import psutil
 # import multiprocessing
@@ -472,12 +472,14 @@ if opt.nogpu: device = torch.device('cpu')
 msg = colorstr('green','[+]device')+" \nUsing device: {}".format(device) 
 #Additional Info when using cuda
 if device.type == 'cuda':
-    msg = msg + " ["
+    msg = msg + " 🚀 ["
     msg = msg + torch.cuda.get_device_name(0)
     msg +=  ']\nGPU mem_allocated: {}GB, cached: {}GB'.format(
-        round(torch.cuda.memory_allocated(0)/1E6,1),
-        round(torch.cuda.memory_reserved(0)/1E6,1),
+        round(torch.cuda.memory_allocated(0)/1E9,1),
+        round(torch.cuda.memory_reserved(0)/1E9,1),
     ) 
+else:
+    msg += " 🚗"
 logger.info(msg)
 
 # clean tqdm for notebook
@@ -517,7 +519,7 @@ if opt.cov_rawdir: ### custom, need rm in lts
     sid2cat_csvfp = str(Path(str(opt.cov_rawdir)) / 'train_study_level.csv')
 if str(fp_cache).endswith('.pkl') and os.path.isfile(fp_cache): 
     # use cache
-    gb = os.path.getsize(fp_cache) / 1E6  # filesize
+    gb = os.path.getsize(fp_cache) / 1E9  # filesize
     logger.info(f'Loading cache from {fp_cache} ({gb:.3f}GB)'  ) 
     try:
         raw_train, raw_test, cached_opt = ax.load_obj(fp_cache,silent=1)
@@ -564,7 +566,7 @@ else:  # create cache
         logger.info("Caching dataset to "+ fp_cache)
         ax.mkdir(Path(fp_cache).parent)
         ax.save_obj([raw_train,raw_test,opt],fp_cache)  
-        logger.info(f'Cached to {fp_cache} ({os.path.getsize(fp_cache) / 1E6 :.3f}GB)')
+        logger.info(f'Cached to {fp_cache} ({os.path.getsize(fp_cache) / 1E9 :.3f}GB)')
 
 # fold
 names = raw_train.names
@@ -793,7 +795,7 @@ for epoch in range(start_epoch,epochs):
     
         mloss = running_loss / (i * batch_size + inputs.size(0))
         macc = running_corrects / (i * batch_size + inputs.size(0))
-        mem = '%.3gG' % (torch.cuda.memory_reserved() / 1E6 if torch.cuda.is_available() else 0)  # (GB)
+        mem = '%.3gG' % (torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0)  # (GB)
         s = ('%10s' * 2 + '%10.4g' * 2) % (
             '%g/%g' % (epoch, epochs - 1), mem ,mloss,macc    )
         pbar.set_description(s, refresh=False)

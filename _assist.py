@@ -98,6 +98,50 @@ def mesh(pix_input,size = None):
     ipv.style.set_style_dark()
 
 
+
+
+
+def dcm2pix_v2(dcm_raw_pix):
+    # has bug, max may == 0
+    lut = apply_voi_lut(dcm_raw_pix, dicom)   
+    uni = np.amax(lut) - lut  if dicom.PhotometricInterpretation == "MONOCHROME1" else lut
+
+    raw_cut = raw - np.min(raw)
+    uni_cut = uni - np.min(uni)
+
+
+    raw_dot = raw_cut / np.max(raw_cut)
+    uni_dot = uni_cut / np.max(uni_cut)
+
+
+    return raw,raw_cut,uni_cut,raw_dot,uni_dot
+
+def dcms2pie_v2(dcms_pix,dst_fp = None,pbar=None): 
+    if 'HALT' in vars() or 'HALT' in globals(): # stop multi-threads
+        if HALT: return 
+
+    dcm_files = sorted(
+                glob.glob(os.path.join(dcms_fp,"*.dcm")), 
+                key=lambda x: int(x[:-4].split("-")[-1]),
+            )
+
+    raw,raw_cut,uni_cut,raw_dot,uni_dot = dcm2pix(dcm_files[0])
+    
+    pie = np.zeros(raw.shape)
+    for f in dcm_files:
+        raw,raw_cut,uni_cut,raw_dot,uni_dot = dcm2pix(f)
+        
+        pie += raw  # must raw here, 1 pie should has same scale 
+
+    if dst_fp is not None: # make file
+        pix2file(pie,dst_fp,do_norm=True) 
+
+    if pbar:
+        pbar.update(1)
+
+    # return pie
+
+
 def dcm2pix(dcm):
     # has bug, max may == 0
     dicom = pydicom.read_file(dcm)
@@ -220,21 +264,6 @@ def make_pies(input_dir,dst_dir,labels_csv_name = 'train_labels.csv',workers = 1
         dst_files += [dst_fp]
         
 
-    # print(dcms_dirs[2],dst_files[2])
-    # dcms2pie(dcms_dirs[2],dst_files[2]) # pie need norm 
-
-    # print(dcms_dirs,dst_files)
-
-    # make pies
-    # gb=0
-    # results = ThreadPool(workers).imap(dcms2pie,   zip(dcms_dirs, dst_files   )) 
-    # pbar = tqdm(enumerate(results) , mininterval=1,)
-    # for i, x in pbar:
-    #     # gb += self.pixs[i].nbytes # sys.getsizeof(b.storage())
-    #     gb +=  x.nbytes
-    #     pbar.desc = f' Cooking pies ({gb / 1E9:.1f}GB)'
-    # pbar.close()
-
     # make pies
     pbar = tqdm(total=len(dcms_dirs), position=0, leave=True,
               desc = f"dcms2pie, {input_dir} > {dst_dir}: ",
@@ -246,6 +275,14 @@ def make_pies(input_dir,dst_dir,labels_csv_name = 'train_labels.csv',workers = 1
     p.join()
 
 
+    # # v2 version 
+    # # read dcms and save to a list 
+    # for c in cohorts: # prevent mem boom 
+    #     dcms_list = 
+    #     pass
+    # # write list to dst_fp
+    # for c in cohorts:
+    #     pass
 
 
 # make_pies(input_dir,dst_dir,workers=16)
@@ -267,6 +304,47 @@ except KeyboardInterrupt:
     HALT = True
     raise
 
+# %%
+def read_dcm(dcm):
+    return pydicom.read_file(dcm).pixel_array
+
+
+
+def read_dcm(fp ,pbar = None):
+    if 'HALT' in vars() or 'HALT' in globals(): # stop multi-threads
+        if HALT: return 
+
+    pix = pydicom.read_file(fp).pixel_array
+ 
+    if pbar:
+        pbar.update(1)
+
+    return pix
+
+
+
+# step1 make dcms 
+
+
+
+    pbar = tqdm(total=len(a_list), position=0, leave=True,
+                desc = f"aa: ", )
+    p=mp.Pool(workers)
+    dcms = p.starmap(read_dcm, zip(a_list,b_list,repeat(pbar)))
+    p.close()
+    pbar.close()
+    p.join()
+
+
+# step2 dcms2pie
+
+    pbar = tqdm(total=len(a_list), position=0, leave=True,
+                desc = f"aa: ", )
+    p=mp.Pool(workers)
+    c_list = p.starmap(foo, zip(a_list,b_list,repeat(pbar)))
+    p.close()
+    pbar.close()
+    p.join()
 
 
 #%% lab: load dicom 
