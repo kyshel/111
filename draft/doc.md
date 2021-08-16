@@ -37,6 +37,7 @@ pie ok
 - unify all the pic direction 
 - try 3 slice technique
 - try auto detect tumor legacy way 
+- wirte a loader that can multithread load, and multithread save , and has progress bar 
 
 
 # done

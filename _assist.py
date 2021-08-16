@@ -198,8 +198,6 @@ def pix2file(pix,dst_fp,do_norm = False,is_norm = False):
     im = Image.fromarray(pix) # np > im
     im.save(dst_fp)
 
-
-
 def seepix(pix,do_norm = False, is_norm = False): 
     if do_norm: pix = (norm(pix) * 255).astype(np.uint8)
     if is_norm: pix = (pix* 255).astype(np.uint8)
@@ -263,8 +261,6 @@ def read_pie(pie_dir, pbar = None):
 
     return pie 
 
-
-
 # step1 make dcms 
 def read_pies(input_dir,cache_dir= '_pies_cache', workers=8):
     
@@ -303,33 +299,13 @@ def read_pies(input_dir,cache_dir= '_pies_cache', workers=8):
 
 
 
-def make_slice(dcm_info): # not inc peformance
-    _fp,dcm = dcm_info
-    raw = dcm.pixel_array
-    lut = apply_voi_lut(raw, dcm)   
-    uni = np.amax(lut) - lut  if dcm.PhotometricInterpretation == "MONOCHROME1" else lut
-
-    # raw_cut = raw - np.min(raw)
-    uni_cut = uni - np.min(uni)
-
-    # raw_dot = raw_cut / np.max(raw_cut) if  np.max(raw_cut) != 0 else raw_cut + 0
-    # uni_dot = uni_cut / np.max(uni_cut) if  np.max(uni_cut) != 0 else uni_cut + 0
-
-    return uni_cut
-
-
-
-
-
 
 
 def make_nob(pie,workers=16,chunksize = 3):
+    # single thread for make_nobs
     pix = 0
 
-    ################ multi thread ######################
-    # results = ThreadPool(workers).imap( make_slice, zip(pie[0::2],pie[1::2]),chunksize=chunksize)  
-    # for uni_cut in results:
-    #     pix += uni_cut
+
 
     ################ single thread ######################
     # for fp,dcm in pie:  # .dcm  
@@ -338,15 +314,16 @@ def make_nob(pie,workers=16,chunksize = 3):
         lut = apply_voi_lut(raw, dcm)   
         uni = np.amax(lut) - lut  if dcm.PhotometricInterpretation == "MONOCHROME1" else lut
 
-        # raw_cut = raw - np.min(raw)
+        raw_cut = raw - np.min(raw)
         uni_cut = uni - np.min(uni)
 
         # raw_dot = raw_cut / np.max(raw_cut) if  np.max(raw_cut) != 0 else raw_cut + 0
         # uni_dot = uni_cut / np.max(uni_cut) if  np.max(uni_cut) != 0 else uni_cut + 0
 
-        pix += uni_cut  # core
-
-
+        # >>>>>>>>>>>>>>>>>>>>>   core <<<<<<<<<<<<<<<<<<<<<
+        # pix += uni_cut  # danger!
+        # pix += uni # need shift
+        pix += uni_cut  #  core
 
     fp = pie[0] # should be pie[0][0] after fix 
     segs = fp.split(os.sep)  # [...,'01raw', 'd', -4'train', -3'00466', -2'FLAIR', -1'0.dcm']
@@ -356,10 +333,8 @@ def make_nob(pie,workers=16,chunksize = 3):
     return pix,dst_fp
 
 
-
-
-
-def make_nobs(input_dir,cache_dir,dst_dir,workers=8,chunksize = 3):  
+def make_nobs(input_dir,cache_dir,dst_dir,workers=16,chunksize = 1):  
+    # make nobs to write pngs
 
     # mkdir and prepare labels.csv
     for seq in SEQS:
@@ -370,10 +345,10 @@ def make_nobs(input_dir,cache_dir,dst_dir,workers=8,chunksize = 3):
         shutil.copy2(csv_src,csv_dst) # cp
 
     # make nobs
-    nobs = []
     for seq in SEQS:
-        # pies = ax.load_obj( os.path.join(cache_dir, f'{seq}.pkl') )  # 60s
-        global pies
+        nobs = []
+        pies = ax.load_obj( os.path.join(cache_dir, f'{seq}.pkl') )  # 60s
+        # global pies
 
         gb=0
         results = ThreadPool(workers).imap( make_nob,  pies ,chunksize= chunksize )  
@@ -385,54 +360,54 @@ def make_nobs(input_dir,cache_dir,dst_dir,workers=8,chunksize = 3):
             del nob
         pbar.close()
 
-        # for pie in tqdm(pies,desc=f'making nobs {seq}'):
-        #     pix = 0
-        #     # for fp,dcm in pie:  # .dcm  
-        #     for fp,dcm in zip(pie[0::2],pie[1::2]):  # .dcm 
-        #         raw = dcm.pixel_array
-        #         lut = apply_voi_lut(raw, dcm)   
-        #         uni = np.amax(lut) - lut  if dcm.PhotometricInterpretation == "MONOCHROME1" else lut
+        ax.save_obj(nobs,os.path.join(cache_dir,f'nobs_{seq}.pkl'))
+        # write nobs
+        for pix,dst_fp in tqdm(nobs,desc=f'writing nobs to {dst_dir}'):
+            pix2file(pix,dst_fp,do_norm=1)
 
-        #         raw_cut = raw - np.min(raw)
-        #         uni_cut = uni - np.min(uni)
+        del pies, nobs, pbar, results
 
-        #         raw_dot = raw_cut / np.max(raw_cut) if  np.max(raw_cut) != 0 else raw_cut + 0
-        #         uni_dot = uni_cut / np.max(uni_cut) if  np.max(uni_cut) != 0 else uni_cut + 0
+    print(f'All Done! Check {dst_dir}')
 
-        #         pix += uni_cut  # core
-
-        #     segs = fp.split(os.sep)  # [...,'01raw', 'd', -4'train', -3'00466', -2'FLAIR', -1'0.dcm']
-        #     split,fn = segs[-4], f'{segs[-3]}.png'
-        #     dst_fp = os.path.join(dst_dir,seq,split,fn)
-
-  
-        #     nobs += [[pix,dst_fp ]]
-
-    ax.save_obj(nobs,os.path.join(cache_dir,f'nobs.pkl'))
-
-    # write nobs
-    for pix,dst_fp in tqdm(nobs,desc=f'writing nobs to {dst_dir}'):
-        pix2file(pix,dst_fp,do_norm=1)
-
-    print(f'Done! Check {dst_dir}')
-
-
-
-
-pies = ax.load_obj( '_pies_cache/FLAIR.pkl' ) # temp
 
 input_dir = '/ap/27bra/01raw/d/'
 cache_dir = '_pies_cache'
 dst_dir = '/ap/27bra/03png_pie2'
 # read_pies(input_dir,cache_dir, workers=16) # ONCE!
-make_nobs(input_dir,cache_dir,dst_dir,workers=16)
+make_nobs(input_dir,cache_dir,dst_dir,workers=16,chunksize=3)
 
 
 
+#%% lab, read bad imgs 
 
 
 
-#%% make pies
+def pix2file2(pix,dst_fp,do_norm = False,is_norm = False,is_expand = False):
+    if do_norm and is_norm: raise Exception('do_norm and is_norm can not co-exist')
+    if do_norm: pix = (norm(pix) * 255).astype(np.uint8)
+    if is_norm: pix = (pix* 255).astype(np.uint8)
+ 
+    im = Image.fromarray(pix) # np > im
+    im.save(dst_fp)
+
+
+def pix2im(pix,do_norm = False,is_norm = False,is_expand = False)
+    if do_norm and is_norm: raise Exception('do_norm and is_norm can not co-exist')
+    if do_norm: pix = (norm(pix) * 255).astype(np.uint8)
+    if is_norm: pix = (pix* 255).astype(np.uint8)
+ 
+    im = Image.fromarray(pix) # np > im
+    return im
+
+
+pie = os.path.join(input_dir,f'')
+pix,dst_fp = make_nob(str(pie))
+
+im = pix2im(pix,do_norm=1,expand = [0.1,0.3,0.6])
+
+
+
+#%% stale, origin version, make pies
 
 from utils import ax
 reload(ax)
@@ -517,6 +492,31 @@ except KeyboardInterrupt:
     raise
 
 
+
+
+
+#%% lab: stale multi thread slice 
+
+################ multi thread ######################
+# results = ThreadPool(workers).imap( make_slice, zip(pie[0::2],pie[1::2]),chunksize=chunksize)  
+# for uni_cut in results:
+#     pix += uni_cut
+
+
+# def make_slice(dcm_info): # not inc peformance
+#     _fp,dcm = dcm_info
+#     raw = dcm.pixel_array
+#     lut = apply_voi_lut(raw, dcm)   
+#     uni = np.amax(lut) - lut  if dcm.PhotometricInterpretation == "MONOCHROME1" else lut
+
+#     # raw_cut = raw - np.min(raw)
+#     uni_cut = uni - np.min(uni)
+
+#     # raw_dot = raw_cut / np.max(raw_cut) if  np.max(raw_cut) != 0 else raw_cut + 0
+#     # uni_dot = uni_cut / np.max(uni_cut) if  np.max(uni_cut) != 0 else uni_cut + 0
+#     return uni_cut
+
+
 #%% lab: load dicom 
  
 fp = '/ap/27bra/01raw/d/train/00000/T1wCE/Image-78.dcm'
@@ -543,12 +543,16 @@ mesh(raw,(128,128))
 
 
 
-# %% lena  pix2file
+# %% lab, lena  pix2file
 import png
-def pix2file(pix,dst_fp,do_norm = False,is_norm = False):
+def pix2file(pix,dst_fp,do_norm = False,is_norm = False,expand = False):
+ 
+
     if do_norm and is_norm: raise Exception('do_norm and is_norm can not co-exist')
     if do_norm: pix = (norm(pix) * 255).astype(np.uint8)
     if is_norm: pix = (pix* 255).astype(np.uint8)
+    
+
  
     im = Image.fromarray(pix) # np > im
     im.save(dst_fp)
