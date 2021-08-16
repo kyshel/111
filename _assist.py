@@ -23,6 +23,12 @@ from importlib import reload
 import glob 
 import os 
 from multiprocessing.pool import ThreadPool
+from utils import ax
+reload(ax)
+import shutil
+from tqdm import tqdm 
+import multiprocessing.dummy as mp 
+from itertools import repeat
 
 reload(matplotlib)
 matplotlib.style.use('dark_background')
@@ -220,6 +226,78 @@ def dcms2pie(dcms_fp,dst_fp = None,pbar=None):
     return pie
 
 
+# %% make_pie v2
+
+from tqdm import tqdm
+
+SEQS = ['FLAIR' , 'T1w' , 'T1wCE' , 'T2w']
+ 
+def read_pie(pie_dir, pbar = None):
+    if 'HALT' in vars() or 'HALT' in globals(): # stop multi-threads
+        if HALT: return 
+
+    dcm_files = sorted(
+                glob.glob(os.path.join(pie_dir,"*.dcm")), 
+                key=lambda x: int(x[:-4].split("-")[-1]),
+            )
+
+    pie = []
+    for fp in dcm_files:
+        pie += [fp, pydicom.read_file(fp).pixel_array]  # [fp,pix], ...
+
+    if pbar:
+        pbar.update(1)
+
+    return pie 
+
+
+
+# step1 make dcms 
+def read_pies(input_dir,workers=8):
+    
+    # pie dirs
+    pie_dirs = {seq:[] for seq in SEQS} # seq: [ pie_dir, pie_dir  ] a pie has many dcms 
+    for split in 'train','test':
+        case_dirs = [ f.path for f in os.scandir(os.path.join(input_dir,split)) if f.is_dir() ]
+        for case_dir in case_dirs:
+            for seq in SEQS: #  [inputdir/split/case/seq/] 00000.dcm
+                pie_dirs[seq] += [os.path.join(case_dir,seq)]
+
+    # pies
+    pies = {seq:[] for seq in SEQS} # { 'FLAIR':[[dcm_fp,dcm_pix],...], ... }
+    for seq in SEQS:
+        pbar = tqdm(total=len(pie_dirs[seq]), position=0, leave=True,
+                    desc = f"read_pies {seq}:", )
+        p=mp.Pool(workers)
+        pies[seq] = p.starmap(read_pie, zip(pie_dirs[seq], repeat(pbar)))
+        p.close()
+        pbar.close()
+        p.join()
+
+
+
+input_dir = '/ap/27bra/01raw/d/'
+HALT = False
+# ax.clean_dir(dst_dir)
+try:
+    read_pies(input_dir, workers=16)
+except KeyboardInterrupt:
+    HALT = True
+    raise
+
+
+
+# step2 dcms2pie
+
+    # pbar = tqdm(total=len(a_list), position=0, leave=True,
+    #             desc = f"aa: ", )
+    # p=mp.Pool(workers)
+    # c_list = p.starmap(foo, zip(a_list,b_list,repeat(pbar)))
+    # p.close()
+    # pbar.close()
+    # p.join()
+
+
 #%% make pies
 
 from utils import ax
@@ -303,48 +381,6 @@ try:
 except KeyboardInterrupt:
     HALT = True
     raise
-
-# %%
-def read_dcm(dcm):
-    return pydicom.read_file(dcm).pixel_array
-
-
-
-def read_dcm(fp ,pbar = None):
-    if 'HALT' in vars() or 'HALT' in globals(): # stop multi-threads
-        if HALT: return 
-
-    pix = pydicom.read_file(fp).pixel_array
- 
-    if pbar:
-        pbar.update(1)
-
-    return pix
-
-
-
-# step1 make dcms 
-
-
-
-    pbar = tqdm(total=len(a_list), position=0, leave=True,
-                desc = f"aa: ", )
-    p=mp.Pool(workers)
-    dcms = p.starmap(read_dcm, zip(a_list,b_list,repeat(pbar)))
-    p.close()
-    pbar.close()
-    p.join()
-
-
-# step2 dcms2pie
-
-    pbar = tqdm(total=len(a_list), position=0, leave=True,
-                desc = f"aa: ", )
-    p=mp.Pool(workers)
-    c_list = p.starmap(foo, zip(a_list,b_list,repeat(pbar)))
-    p.close()
-    pbar.close()
-    p.join()
 
 
 #%% lab: load dicom 
