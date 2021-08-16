@@ -5,6 +5,8 @@
 #%% func  444
 
 %matplotlib inline
+
+
 import pydicom  
 from pydicom.pixel_data_handlers.util import apply_voi_lut
 import numpy as np 
@@ -29,6 +31,15 @@ import shutil
 from tqdm import tqdm 
 import multiprocessing.dummy as mp 
 from itertools import repeat
+import logging
+logging.basicConfig(
+        format="%(message)s",
+        level=logging.INFO,
+        handlers=[
+            logging.StreamHandler()
+        ]
+    )
+logger = logging.getLogger(__name__)
 
 reload(matplotlib)
 matplotlib.style.use('dark_background')
@@ -189,11 +200,10 @@ def pix2file(pix,dst_fp,do_norm = False,is_norm = False):
 
 
 
- 
-
-
-def seepix(pix,do_norm = False): 
+def seepix(pix,do_norm = False, is_norm = False): 
     if do_norm: pix = (norm(pix) * 255).astype(np.uint8)
+    if is_norm: pix = (pix* 255).astype(np.uint8)
+
     im = Image.fromarray(pix) # np > im 
     im.show()
 
@@ -231,6 +241,7 @@ def dcms2pie(dcms_fp,dst_fp = None,pbar=None):
 from tqdm import tqdm
 
 SEQS = ['FLAIR' , 'T1w' , 'T1wCE' , 'T2w']
+HALT = False
  
 def read_pie(pie_dir, pbar = None):
     if 'HALT' in vars() or 'HALT' in globals(): # stop multi-threads
@@ -243,7 +254,9 @@ def read_pie(pie_dir, pbar = None):
 
     pie = []
     for fp in dcm_files:
-        pie += [fp, pydicom.read_file(fp).pixel_array]  # [fp,pix], ...
+        dcm = pydicom.read_file(fp)
+        pie += [[fp, pydicom.read_file(fp) ]]  # [fp,dcm], ...
+        # pie +=  fp, pydicom.read_file(fp)    # [fp,dcm], ...
 
     if pbar:
         pbar.update(1)
@@ -253,7 +266,7 @@ def read_pie(pie_dir, pbar = None):
 
 
 # step1 make dcms 
-def read_pies(input_dir,workers=8):
+def read_pies(input_dir,cache_dir= '_pies_cache', workers=8):
     
     # pie dirs
     pie_dirs = {seq:[] for seq in SEQS} # seq: [ pie_dir, pie_dir  ] a pie has many dcms 
@@ -268,34 +281,155 @@ def read_pies(input_dir,workers=8):
     for seq in SEQS:
         pbar = tqdm(total=len(pie_dirs[seq]), position=0, leave=True,
                     desc = f"read_pies {seq}:", )
-        p=mp.Pool(workers)
-        pies[seq] = p.starmap(read_pie, zip(pie_dirs[seq], repeat(pbar)))
-        p.close()
+
+        global HALT 
+        HALT = False
+        try:
+            p=mp.Pool(workers)
+            pies[seq] = p.starmap(read_pie, zip(pie_dirs[seq], repeat(pbar)))
+            p.close()
+            pbar.close()
+            p.join()
+        
+            ax.mkdir(cache_dir)
+            ax.save_obj(pies[seq],os.path.join(cache_dir, f'{seq}.pkl'))
+            pies[seq] = [] # release mem
+        except KeyboardInterrupt:
+            HALT = True
+            raise
+
+    print(f'read_pies all done! check f{cache_dir}')
+
+
+
+
+def make_slice(dcm_info): # not inc peformance
+    _fp,dcm = dcm_info
+    raw = dcm.pixel_array
+    lut = apply_voi_lut(raw, dcm)   
+    uni = np.amax(lut) - lut  if dcm.PhotometricInterpretation == "MONOCHROME1" else lut
+
+    # raw_cut = raw - np.min(raw)
+    uni_cut = uni - np.min(uni)
+
+    # raw_dot = raw_cut / np.max(raw_cut) if  np.max(raw_cut) != 0 else raw_cut + 0
+    # uni_dot = uni_cut / np.max(uni_cut) if  np.max(uni_cut) != 0 else uni_cut + 0
+
+    return uni_cut
+
+
+
+
+
+
+
+def make_nob(pie,workers=16,chunksize = 3):
+    pix = 0
+
+    ################ multi thread ######################
+    # results = ThreadPool(workers).imap( make_slice, zip(pie[0::2],pie[1::2]),chunksize=chunksize)  
+    # for uni_cut in results:
+    #     pix += uni_cut
+
+    ################ single thread ######################
+    # for fp,dcm in pie:  # .dcm  
+    for fp,dcm in zip(pie[0::2],pie[1::2]):  # .dcm 
+        raw = dcm.pixel_array
+        lut = apply_voi_lut(raw, dcm)   
+        uni = np.amax(lut) - lut  if dcm.PhotometricInterpretation == "MONOCHROME1" else lut
+
+        # raw_cut = raw - np.min(raw)
+        uni_cut = uni - np.min(uni)
+
+        # raw_dot = raw_cut / np.max(raw_cut) if  np.max(raw_cut) != 0 else raw_cut + 0
+        # uni_dot = uni_cut / np.max(uni_cut) if  np.max(uni_cut) != 0 else uni_cut + 0
+
+        pix += uni_cut  # core
+
+
+
+    fp = pie[0] # should be pie[0][0] after fix 
+    segs = fp.split(os.sep)  # [...,'01raw', 'd', -4'train', -3'00466', -2'FLAIR', -1'0.dcm']
+    split,fn,seq = segs[-4], f'{segs[-3]}.png', segs[-2]
+    dst_fp = os.path.join(dst_dir,seq,split,fn)
+
+    return pix,dst_fp
+
+
+
+
+
+def make_nobs(input_dir,cache_dir,dst_dir,workers=8,chunksize = 3):  
+
+    # mkdir and prepare labels.csv
+    for seq in SEQS:
+        for split in 'train','test':
+            ax.mkdir(os.path.join(dst_dir,seq,split))
+        csv_src = os.path.join(input_dir,'train_labels.csv')
+        csv_dst = os.path.join(dst_dir,seq,'labels.csv')
+        shutil.copy2(csv_src,csv_dst) # cp
+
+    # make nobs
+    nobs = []
+    for seq in SEQS:
+        # pies = ax.load_obj( os.path.join(cache_dir, f'{seq}.pkl') )  # 60s
+        global pies
+
+        gb=0
+        results = ThreadPool(workers).imap( make_nob,  pies ,chunksize= chunksize )  
+        pbar = tqdm(enumerate(results), total= len(pies)  )
+        for i, nob in pbar:
+            nobs += [nob]
+            gb +=  nob[0].nbytes
+            pbar.desc = f'{seq} making nobs ({gb / 1E9:.1f}GB)'
+            del nob
         pbar.close()
-        p.join()
+
+        # for pie in tqdm(pies,desc=f'making nobs {seq}'):
+        #     pix = 0
+        #     # for fp,dcm in pie:  # .dcm  
+        #     for fp,dcm in zip(pie[0::2],pie[1::2]):  # .dcm 
+        #         raw = dcm.pixel_array
+        #         lut = apply_voi_lut(raw, dcm)   
+        #         uni = np.amax(lut) - lut  if dcm.PhotometricInterpretation == "MONOCHROME1" else lut
+
+        #         raw_cut = raw - np.min(raw)
+        #         uni_cut = uni - np.min(uni)
+
+        #         raw_dot = raw_cut / np.max(raw_cut) if  np.max(raw_cut) != 0 else raw_cut + 0
+        #         uni_dot = uni_cut / np.max(uni_cut) if  np.max(uni_cut) != 0 else uni_cut + 0
+
+        #         pix += uni_cut  # core
+
+        #     segs = fp.split(os.sep)  # [...,'01raw', 'd', -4'train', -3'00466', -2'FLAIR', -1'0.dcm']
+        #     split,fn = segs[-4], f'{segs[-3]}.png'
+        #     dst_fp = os.path.join(dst_dir,seq,split,fn)
+
+  
+        #     nobs += [[pix,dst_fp ]]
+
+    ax.save_obj(nobs,os.path.join(cache_dir,f'nobs.pkl'))
+
+    # write nobs
+    for pix,dst_fp in tqdm(nobs,desc=f'writing nobs to {dst_dir}'):
+        pix2file(pix,dst_fp,do_norm=1)
+
+    print(f'Done! Check {dst_dir}')
 
 
+
+
+pies = ax.load_obj( '_pies_cache/FLAIR.pkl' ) # temp
 
 input_dir = '/ap/27bra/01raw/d/'
-HALT = False
-# ax.clean_dir(dst_dir)
-try:
-    read_pies(input_dir, workers=16)
-except KeyboardInterrupt:
-    HALT = True
-    raise
+cache_dir = '_pies_cache'
+dst_dir = '/ap/27bra/03png_pie2'
+# read_pies(input_dir,cache_dir, workers=16) # ONCE!
+make_nobs(input_dir,cache_dir,dst_dir,workers=16)
 
 
 
-# step2 dcms2pie
 
-    # pbar = tqdm(total=len(a_list), position=0, leave=True,
-    #             desc = f"aa: ", )
-    # p=mp.Pool(workers)
-    # c_list = p.starmap(foo, zip(a_list,b_list,repeat(pbar)))
-    # p.close()
-    # pbar.close()
-    # p.join()
 
 
 #%% make pies
@@ -377,7 +511,7 @@ dst_dir = '/ap/27bra/03png_pie2'
 HALT = False
 # ax.clean_dir(dst_dir)
 try:
-    make_pies(input_dir,dst_dir,workers=16)
+    make_pies(input_dir,dst_dir,workers=8)
 except KeyboardInterrupt:
     HALT = True
     raise

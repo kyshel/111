@@ -189,17 +189,19 @@ def ins(v):
     print("ins<<<")
 
 
-def save_obj(obj1, fp='tmp_obj.txt',silent = 0):
+def save_obj(obj1, fp='tmp_obj.pkl',silent = 0):
+    if not silent: print('saving obj to ' + fp)
     with open(fp, 'wb') as handle:
         pickle.dump(obj1, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    if not silent: print('save_obj ok! please check ' + fp)
+    if not silent: print('save_obj ok!   '  )
     pass
 
 
 def load_obj(filename='tmp_obj.txt', silent = 0):
+    if not silent: print('loading obj ' + filename)
     with open(filename, 'rb') as handle:
         b = pickle.load(handle)
-    if not silent: print('load_obj ok! src_file: ' + filename)
+    if not silent: print('load_obj ok!  '  )
     return b
     pass
 
