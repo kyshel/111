@@ -5,6 +5,13 @@
 
 # >>>>>>>>>>>>>>>>>>>>  27bra >>>>>>>>>>>>>>>>>>>>>>
 
+# recom args
+center_crop_ratio = 0.9
+random_crop_ratio = 0.8
+img_size: [192,192] 
+model: resnet18
+
+
  
 # some thoughts to 27bra
 

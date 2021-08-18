@@ -207,7 +207,10 @@ def get(model_name, num_classes, feature_extract=False, use_pretrained=True):
     #   variables is model specific.
     model_ft = None
     if feature_extract:
-        print("Freeze enbled!")
+        print("Freeze enabled!")
+    
+    if use_pretrained:
+        print("Pretrained enabled!")
     
     model_name = 'efficientnet-b0' if model_name in ['efb0'] else model_name
 

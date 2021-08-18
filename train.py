@@ -64,6 +64,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 ax.mkdir('_log')
 logger.addHandler(logging.FileHandler('_log/logger.txt')) 
+info = {}
 
 # device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -279,6 +280,49 @@ def inverse_normalize(tensor, mean =(0.5,0.5,0.5),std=(0.5,0.5,0.5)):
     tensor.mul_(std).add_(mean)
     return tensor
 
+def get_mean_and_std(dataset,batch=1,desc=''):
+    loader = torch.utils.data.DataLoader(dataset, batch_size=batch,)
+    nimages = 0
+    mean = 0.0
+    var = 0.0
+    for i_batch, batch_target in enumerate(tqdm(loader,desc = desc),0):
+        batch = batch_target[0]
+        # Rearrange batch to be the shape of [B, C, W * H]
+        batch = batch.view(batch.size(0), batch.size(1), -1)
+        # Update total number of images
+        nimages += batch.size(0)
+        # Compute mean and std here
+        mean += batch.mean(2).sum(0) 
+        var += batch.var(2).sum(0)
+
+    mean /= nimages
+    var /= nimages
+    std = torch.sqrt(var)
+    print(f'{[round(x,4) for x in mean.tolist()]}, '
+        +f'{[round(x,4) for x in std.tolist()]}')
+
+
+def calc_mean_std(opt,transform,rawset):
+    raw_train = rawset(
+        opt = opt,
+        train=True,
+        transform=transform,
+        workers = opt.workers,
+        cache_images = opt.cache,
+        )
+
+    raw_test = rawset(
+        opt = opt,
+        train=False,                    
+        transform=transform ,
+        workers = opt.workers,
+        cache_images = opt.cache,
+        )
+
+
+    get_mean_and_std(raw_train,batch = opt.batch,desc = 'Calcing raw_train')
+    get_mean_and_std(raw_test,batch = opt.batch,desc = 'Calcing raw_test')
+    exit('U set calc-mean-std, stop now.')
 
  
 # infer(validloader,model,names,3)
@@ -318,6 +362,8 @@ parser.add_argument('--epochs', type=int, default=3)
 parser.add_argument('--nodev', action='store_true', help='only save final checkpoint')
 parser.add_argument('--nogpu', action='store_true', help='only save final checkpoint')
 parser.add_argument('--subset-ratio',type=str,   default='0', help='ratio of sub-trainset and sub-testset')
+parser.add_argument('--calc-mean-std',action='store_true', help='ratio of sub-trainset and sub-testset')
+
 
 # custom
 parser.add_argument('--cov_rawdir',nargs='?', const=True, default=False, help='resume most recent training')
@@ -491,28 +537,54 @@ except Exception:
 
 
 # transform Covid
-train_mean, train_std = [0.5234, 0.5234, 0.5234], [0.2165, 0.2165, 0.2165]
+
+# train_mean, train_std = [0.485, 0.456, 0.406], [0.229, 0.224, 0.225] # resnet18 
+# test_mean, test_std = train_mean, train_std
+
+
+# train_mean, train_std = [0.5, 0.5, 0.5], [0.5, 0.5, 0.5] # 27bra
+# test_mean, test_std = [0.5, 0.5, 0.5], [0.5, 0.5, 0.5]
+
+
+# train_mean, train_std = [0.0007, 0.0031, 0.1784], [0.0181, 0.0413, 0.277] # 27bra
+# test_mean, test_std = [0.0007, 0.003, 0.1758], [0.0186, 0.041, 0.2753]
+
+train_mean, train_std = [0.5234, 0.5234, 0.5234], [0.2165, 0.2165, 0.2165] # 21cov
 test_mean, test_std = [0.5213, 0.5213, 0.5213], [0.2199, 0.2199, 0.2199]
-random_crop_size = (int(opt.img_size[0]*0.8),int(opt.img_size[1]*0.8))
-policies = [T.AutoAugmentPolicy.CIFAR10, T.AutoAugmentPolicy.IMAGENET, T.AutoAugmentPolicy.SVHN]
-augmenters = [T.AutoAugment(policy) for policy in policies]
+center_crop_ratio = 0.9
+random_crop_ratio = 0.8
+random_crop_size = (int(opt.img_size[0]*random_crop_ratio),
+    int(opt.img_size[1]*random_crop_ratio))
 transform_train = transforms.Compose([
     # transforms.RandomAutocontrast(),  # not work in 1.7.0
     transforms.Resize(opt.img_size),
-    transforms.RandomCrop(size=random_crop_size),
+    transforms.CenterCrop(int(opt.img_size[0]*center_crop_ratio)),
     T.RandomHorizontalFlip(p=0.5),
+    transforms.RandomCrop(size=random_crop_size),
     # T.AutoAugment(T.AutoAugmentPolicy.CIFAR10),
     transforms.ToTensor(), 
-        transforms.Normalize(train_mean,train_std)])
-transform_test = transforms.Compose([
-    # transforms.RandomAutocontrast(),   # not work in 1.7.0
+    transforms.Normalize(train_mean,train_std),
+    # transforms.RandomErasing(p=0.1), # seems like bad 
+    ])
+
+transform_test = transform_train
+# transform_test = transforms.Compose([
+#     # transforms.RandomAutocontrast(),   # not work in 1.7.0
+    
+#     transforms.Resize(opt.img_size),
+#     transforms.CenterCrop(int(opt.img_size[0]*center_crop_ratio)),
+#     T.RandomHorizontalFlip(p=0.5),
+#     transforms.RandomCrop(size=random_crop_size),
+#     # T.AutoAugment(T.AutoAugmentPolicy.CIFAR10),
+#     transforms.ToTensor(),
+#     transforms.Normalize(test_mean, test_std)])
+transform_mean_and_std = transforms.Compose([
     transforms.Resize(opt.img_size),
-    transforms.RandomCrop(size=random_crop_size),
-    T.RandomHorizontalFlip(p=0.5),
-    # T.AutoAugment(T.AutoAugmentPolicy.CIFAR10),
-    transforms.ToTensor(),
-        transforms.Normalize(test_mean, test_std)])
- 
+    transforms.ToTensor(),])
+info['center_crop_ratio'] = center_crop_ratio
+info['random_crop_ratio'] = random_crop_ratio
+
+
 
 #%% dataset 
 # dataset
@@ -551,6 +623,8 @@ else:  # create cache
         rawset = datasets.LoadImageAndLabels
     else:                          #  load dataset by class name
         rawset = getattr(datasets, opt.data)   
+
+    if opt.calc_mean_std: calc_mean_std(opt,transform_mean_and_std,rawset)
 
     raw_train = rawset(
         opt,
@@ -753,8 +827,10 @@ summary_str += "  raw_train:{},raw_test:{}, trainset:{}, validset:{}, nc:{}, bat
 )
 # logger.info(model)
 logger.info(summary_str)
+logger.info(f'addtional_info: {str(info)}')
 writer.add_text('summary', summary_str, 0)
 writer.add_text('opt', str(opt.__dict__), 0)
+writer.add_text('addtional_info',str(info),0)
 
 # visual model in bash 
 if opt.inspect:

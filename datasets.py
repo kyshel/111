@@ -333,6 +333,7 @@ class LoadImageAndLabels(VisionDataset):
         self.split = split
         self.cache_images = cache_images
         self.transform = transform
+        self.opt = opt
         
 
         # get data.yaml info 
