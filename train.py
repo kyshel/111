@@ -33,6 +33,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from tqdm import tqdm 
 from torch.optim import lr_scheduler
+import torchvision.transforms as T
  
 from utils import ax
 from importlib import reload
@@ -492,14 +493,23 @@ except Exception:
 # transform Covid
 train_mean, train_std = [0.5234, 0.5234, 0.5234], [0.2165, 0.2165, 0.2165]
 test_mean, test_std = [0.5213, 0.5213, 0.5213], [0.2199, 0.2199, 0.2199]
+random_crop_size = (int(opt.img_size[0]*0.8),int(opt.img_size[1]*0.8))
+policies = [T.AutoAugmentPolicy.CIFAR10, T.AutoAugmentPolicy.IMAGENET, T.AutoAugmentPolicy.SVHN]
+augmenters = [T.AutoAugment(policy) for policy in policies]
 transform_train = transforms.Compose([
     # transforms.RandomAutocontrast(),  # not work in 1.7.0
     transforms.Resize(opt.img_size),
+    transforms.RandomCrop(size=random_crop_size),
+    T.RandomHorizontalFlip(p=0.5),
+    # T.AutoAugment(T.AutoAugmentPolicy.CIFAR10),
     transforms.ToTensor(), 
         transforms.Normalize(train_mean,train_std)])
 transform_test = transforms.Compose([
     # transforms.RandomAutocontrast(),   # not work in 1.7.0
     transforms.Resize(opt.img_size),
+    transforms.RandomCrop(size=random_crop_size),
+    T.RandomHorizontalFlip(p=0.5),
+    # T.AutoAugment(T.AutoAugmentPolicy.CIFAR10),
     transforms.ToTensor(),
         transforms.Normalize(test_mean, test_std)])
  
