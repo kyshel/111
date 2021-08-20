@@ -343,7 +343,7 @@ parser.add_argument('--notest', action='store_true', help='only test final epoch
 parser.add_argument('--nowandb', action='store_true', help='disable wandb')
 parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--proxy', nargs='?', const=True, default=False, help='proxy')
-parser.add_argument('--name', default='exp', help='save to project/name')
+parser.add_argument('--name', type=str,default='exp', help='save to project/name')
 parser.add_argument('--model', default='resnet18', help='set model when from scratch')
 parser.add_argument('--kfold', nargs='?', const=True, default=False, help='resume most recent training')
 parser.add_argument('--skfold', nargs='?', const=True, default=False, help='resume most recent training')
@@ -422,7 +422,7 @@ phyzical_cores = psutil.cpu_count(logical = False)
 logical_cores = psutil.cpu_count(logical = True)
 opt.data = f"{opt.data}.yaml" if opt.data in opt_data_fasts else opt.data
 opt.nowandb = True if opt.task == 'test' else opt.nowandb
-opt.save_dir = str(increment_path(Path(opt.project) / opt.name,exist_ok=opt.exist_ok))
+opt.save_dir = str(increment_path(Path(opt.project) / str(opt.name),exist_ok=opt.exist_ok))
 opt.workers = logical_cores if opt.workers == 0 else opt.workers
 # task
 logger.info(colorstr('green','[+]task')+f'\n{opt.task}')
@@ -444,15 +444,17 @@ else:
 
 # Reproducibility,  NOT work in notebook!
 logger.info(colorstr('green','[+]repro')+'')
-seed = random.randint(0,9999)
+seed = 0 # random.randint(0,9999)
 if opt.repro:
     seed = opt.seed
+    random.seed(seed)
     os.environ['ICH_REPRO'] = '1'
     os.environ['ICH_SEED'] = str(seed)
     import models  # must after os.emviron is defined
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
     torch.manual_seed(seed)
     np.random.seed(seed)
+    torch.backends.cudnn.benchmark = False
     if version.parse(torch.__version__) >= version.parse("1.8.0"):
         torch.use_deterministic_algorithms(True)
     torch.backends.cudnn.deterministic = True
@@ -559,8 +561,8 @@ transform_train = transforms.Compose([
     # transforms.RandomAutocontrast(),  # not work in 1.7.0
     transforms.Resize(opt.img_size),
     transforms.CenterCrop(int(opt.img_size[0]*center_crop_ratio)),
-    T.RandomHorizontalFlip(p=0.5),
-    transforms.RandomCrop(size=random_crop_size),
+    # T.RandomHorizontalFlip(p=0.5),
+    # transforms.RandomCrop(size=random_crop_size),
     # T.AutoAugment(T.AutoAugmentPolicy.CIFAR10),
     transforms.ToTensor(), 
     transforms.Normalize(train_mean,train_std),

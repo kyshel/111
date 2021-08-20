@@ -27,7 +27,7 @@ import argparse
 import yaml 
 from pprint import pprint 
 from torchvision.datasets.utils import check_integrity, download_and_extract_archive
-
+import random
 
 # logger 
 for handler in logging.root.handlers[:]:  
@@ -54,6 +54,7 @@ if (repro_flag in os.environ) and (repro_seed in os.environ):
     seed = int(os.environ[repro_seed])
     if os.environ[repro_flag] == '1':
         os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+        random.seed(seed)
         torch.manual_seed(seed)
         np.random.seed(seed)
         if version.parse(torch.__version__) >= version.parse("1.8.0"):
@@ -363,7 +364,7 @@ class LoadImageAndLabels(VisionDataset):
         # make files list from images
         # f = []
         files = {}
-        files = sorted(glob.glob( str(src / split / '*')  ))
+        files = sorted(glob.glob( str(src / split / '*')  )) # sorted for repro 
         images = [x for x in files if x.split('.')[-1].lower() in img_formats]
 
         # subset

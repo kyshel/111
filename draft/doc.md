@@ -1,6 +1,18 @@
 
+# 0819
+embrace the change, do the thing that challenge
+
+# workflow
+- augument image by limiting window 
 
 
+
+# done 
+- read discussions
+
+# throw 
+- pytorch video data  baseline run 
+- 27bra baseline run 
 
 
 # >>>>>>>>>>>>>>>>>>>>  27bra >>>>>>>>>>>>>>>>>>>>>>

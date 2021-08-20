@@ -324,7 +324,7 @@ def pix2im(pix,do_norm = False,is_norm = False,is_expand = False):
 #%% lab, read bad imgs 
 def make_nob(pie,workers=16,chunksize = 3):
     # make nob
-    pix = 0
+    kop = 0
     for fp,dcm in pie:  # .dcm  
         raw = dcm.pixel_array
         lut = apply_voi_lut(raw, dcm)   
@@ -341,14 +341,14 @@ def make_nob(pie,workers=16,chunksize = 3):
         final = uni_dot
 
         # print(final.max() )
-        pix += final  #  core
+        kop += final  #  core
 
     fp = pie[0][0] # should be pie[0][0] after fix 
     segs = fp.split(os.sep)  # [...,'01raw', 'd', -4'train', -3'00466', -2'FLAIR', -1'0.dcm']
     split,fn,seq = segs[-4], f'{segs[-3]}.png', segs[-2]
     dst_fp = os.path.join(dst_dir,seq,split,fn)
 
-    return pix,dst_fp
+    return kop,dst_fp
 
 def scale(x, horizon = None, peak = None):   
     m = horizon if horizon is not None else x.min()  # horizon maybe equal to 0
@@ -417,9 +417,10 @@ for seq in SEQS:
     # multi dcms squash to nob
     pie = read_pie(f'/ap/27bra/01raw/d/train/{yes[0]}/{seq}')
     # print(pie[0][1].pixel_array)
-    pix,dst_fp = make_nob(pie)
-    # pix = kop2rgb2pix(pix,[0.90,0.95]) 
-    im = pix2im(pix ,do_norm = 1)
+    kop,dst_fp = make_nob(pie)
+    pix = kop2pix(kop)
+    # pix = kop2rgb2pix(kop,[0.90,0.95]) 
+    im = pix2im(pix )
     im.show()
 
 print('ok!')
@@ -443,8 +444,285 @@ input_dir = '/ap/27bra/01raw/d/'
 cache_dir = '_pies_cache'
 dst_dir = '/ap/27bra/03png_pie2'
 # read_pies(input_dir,cache_dir, workers=16) # ONCE!
-make_nobs(input_dir,cache_dir,dst_dir,workers=16,chunksize=3)
+# make_nobs(input_dir,cache_dir,dst_dir,workers=16,chunksize=3)
 
+
+
+#%% lab, get mid ratio
+
+def get_mid_ratio(items, ratio = 0.8):
+    l = len(items)
+    border = (1-ratio)/2
+    return items[int(border*l):int((1-border)*l)]
+
+get_mid_ratio(list(range(100)),0.6)
+
+
+#%% lab, 2019
+import joblib
+import PIL
+# from glob import glob
+import glob
+reload(glob)
+import pydicom
+import numpy as np
+import pandas as pd
+import os
+import cv2
+import json
+import matplotlib.pyplot as plt
+import seaborn as sns
+from collections import Counter
+from PIL import Image
+import math
+import seaborn as sns
+from collections import defaultdict
+from pathlib import Path
+import cv2
+from tqdm import tqdm
+import re
+import logging as l
+
+import argparse
+
+def get_first_of_dicom_field_as_int(x):
+    if type(x) == pydicom.multival.MultiValue:
+        return int(x[0])
+    return int(x)
+
+def get_id(img_dicom):
+    return str(img_dicom.SOPInstanceUID)
+
+def get_metadata_from_dicom(img_dicom):
+    metadata = {
+        "window_center": img_dicom.WindowCenter,
+        "window_width": img_dicom.WindowWidth,
+        "intercept": img_dicom.RescaleIntercept,
+        "slope": img_dicom.RescaleSlope,
+    }
+    return {k: get_first_of_dicom_field_as_int(v) for k, v in metadata.items()}
+
+def window_image_RM(img, window_center, window_width, intercept = 0, slope = 1):
+    img = img * slope + intercept
+    img_min = window_center - window_width / 2
+    img_max = window_center + window_width / 2
+    img[img < img_min] = img_min
+    img[img > img_max] = img_max
+    return img 
+
+def window_image(dot, window_center, window_width, intercept = 0, slope = 1):
+    img = dot 
+    img = img * slope + intercept
+    img_min = window_center - window_width / 2
+    img_max = window_center + window_width / 2
+    img[img < img_min] = 0
+    img[img > img_max] = 1
+    dot =img
+    return dot 
+
+
+# def resize(img, new_w, new_h):
+#     img = PIL.Image.fromarray(img.astype(np.int8), mode="L")
+#     return img.resize((new_w, new_h), resample=PIL.Image.BICUBIC)
+
+def save_img(img_pil, subfolder, name):
+    img_pil.save(subfolder+name+'.png')
+
+def normalize_minmax(img):
+    mi, ma = img.min(), img.max()
+    return (img - mi) / (ma - mi)
+
+def prepare_image(img_path):
+    img_dicom = pydicom.read_file(img_path)
+    img_id = get_id(img_dicom)
+    
+    metadata = get_metadata_from_dicom(img_dicom)
+    print(metadata)
+    metadata['window_width'] = int(metadata['window_width'] * 0.1)
+    img = window_image(img_dicom.pixel_array, **metadata)
+
+    SEQS = ['FLAIR' , 'T1w' , 'T1wCE' , 'T2w']
+    for seq in SEQS:
+        # multi dcms squash to nob
+        pie = read_pie(f'/ap/27bra/01raw/d/train/{yes[46]}/T1w')
+        kop,dst_fp = make_nob(pie)
+        # dot = norm(img_dicom.pixel_array)
+        dot = norm(kop)
+        
+
+        hist(dot, np.arange(0,1,0.1))
+        dot = window_image(dot,   0.75,0.5) 
+        print(dot.max(),dot.min())
+        mesh(dot,64)
+        
+        # img = kop
+        break
+
+    
+    # img = window_image(img,1500,400,0,1)  # rewindow
+    # img = normalize_minmax(img) * 255
+    dot = scale(dot,0,1)
+    pix = dot*255
+     
+    img = PIL.Image.fromarray(pix.astype(np.int8), mode="L")
+    
+    return img_id, img
+# /ap/27bra/01raw/d/train/00006/T2w/Image-200.dcm          /ap/27bra/01raw/d/train/00000/FLAIR/Image-250.dcm
+id,im = prepare_image(f'/ap/27bra/01raw/d/train/00006/T1w/Image-10.dcm')
+im.show()
+
+#%% lab histo 
+%matplotlib inline
+import matplotlib
+from importlib import reload
+# reload(matplotlib)
+matplotlib.style.use('dark_background')
+
+def hist(input_2d,bins = 'auto'):
+    y, x = np.histogram(input_2d.ravel(), bins=bins)
+    fig, ax = plt.subplots()
+    ax.plot(x[:-1], y)
+    fig.show()
+
+# hist(raw_cut,np.arange(500,1200,5)   )
+# hist(uni_cut,np.arange(10000,16000,100))
+# hist(raw_dot,np.arange(0.1,0.2,0.01))  # np.arange(0.3,0.7,0.01)
+
+
+
+
+
+#%% lab, adjust contrast , self achieve
+def get_first_of_dicom_field_as_int(x):
+    if type(x) == pydicom.multival.MultiValue:
+        return int(x[0])
+    return int(x)
+
+def get_id(img_dicom):
+    return str(img_dicom.SOPInstanceUID)
+
+def get_metadata_from_dicom(img_dicom):
+    metadata = {
+        "window_center": img_dicom.WindowCenter,
+        "window_width": img_dicom.WindowWidth,
+        "intercept": img_dicom.RescaleIntercept,
+        "slope": img_dicom.RescaleSlope,
+    }
+    return {k: get_first_of_dicom_field_as_int(v) for k, v in metadata.items()}
+
+def window_image(img, window_center, window_width, intercept, slope):
+    img = img * slope + intercept
+    img_min = window_center - window_width // 2
+    img_max = window_center + window_width // 2
+    img[img < img_min] = img_min
+    img[img > img_max] = img_max
+    return img 
+
+def prepare_image(img_path):
+    img_dicom = pydicom.read_file(img_path)
+    img_id = get_id(img_dicom)
+    metadata = get_metadata_from_dicom(img_dicom)
+    img = window_image(img_dicom.pixel_array, **metadata)
+    img = window_image(img,1500,400,0,1)  # rewindow
+
+    return img_id, img
+
+
+id, kop = prepare_image(f'/ap/27bra/01raw/d/train/00000/FLAIR/Image-250.dcm')
+
+
+
+# # # single dcm 
+# raw,raw_cut,uni_cut,raw_dot,uni_dot = \
+#     dcm2pix(f'/ap/27bra/01raw/d/train/00000/FLAIR/Image-250.dcm')
+# print(raw.max(),raw.min())
+# raw = window_image(raw,1000,400,0,1)
+
+# pix = kop2pix(raw)
+# # # pix = kop2rgb2pix(uni_cut,[0.3,0.7])
+# im = pix2im(pix)
+# im.show()
+
+# print(111)
+
+#%% lab, adjusting contrast
+# Make a simple linear VOI LUT from the raw (stored) pixel data
+def make_lut(storedPixels, windowWidth, windowLevel, p_i):
+    
+    # Slope and Intercept set to 1 and 0 for MR. Get these from DICOM tags instead if using 
+    # on a modality that requires them (CT, PT etc)
+    slope = 1.0
+    intercept = 0.0
+    minPixel = int(np.amin(storedPixels))
+    maxPixel = int(np.amax(storedPixels))
+
+    # Make an empty array for the LUT the size of the pixel 'width' in the raw pixel data
+    lut = [0] * (maxPixel + 1)
+    
+    # Invert pixels and windowLevel for MONOCHROME1. We invert the specified windowLevel so that 
+    # increasing the level value makes the images brighter regardless of photometric intrepretation
+    invert = False
+    if p_i == "MONOCHROME1":
+        invert = True
+    else:
+        windowLevel = (maxPixel - minPixel) - windowLevel
+        
+    # Loop through the pixels and calculate each LUT value
+    for storedValue in range(minPixel, maxPixel):
+        modalityLutValue = storedValue * slope + intercept
+        voiLutValue = (((modalityLutValue - windowLevel) / windowWidth + 0.5) * 255.0)
+        clampedValue = min(max(voiLutValue, 0), 255)
+        if invert:
+            lut[storedValue] = round(255-clampedValue)
+        else:
+            lut[storedValue] = round(clampedValue)
+        
+    return lut
+
+# Apply the LUT to a pixel array
+def apply_lut(pixels_in, lut):
+    
+    pixels_in = pixels_in.flatten()
+    pixels_out = [0] * len(pixels_in)
+    
+    for i in range(0, len(pixels_in)):
+        pixel = pixels_in[i]
+        pixels_out[i] = int(lut[pixel])
+        
+    return pixels_out
+
+
+# Load an image
+fp = os.path.join(input_dir,'train/00006/T2w/Image-200.dcm')
+image = pydicom.dcmread(fp)
+pixels = image.pixel_array
+
+# Print out the pixel 'width'
+print("Min pixel value: " + str(np.min(pixels)))
+print("Max pixel value: " + str(np.max(pixels)))
+
+plt.figure(figsize= (6,6))
+plt.imshow(pixels, cmap='gray');
+
+
+# Apply three different WW/WL settings via LUT. We'll set the level slightly less than half to adjust for brightness.
+window_width = 1500
+window_level = 2000
+
+lut = make_lut(image.pixel_array, window_width, window_level, image.PhotometricInterpretation)
+image1 = np.reshape(apply_lut(pixels, lut), (pixels.shape[0],pixels.shape[1]))
+
+window_width = 1000
+window_level = 2000
+
+lut = make_lut(image.pixel_array, window_width, window_level, image.PhotometricInterpretation)
+image2 = np.reshape(apply_lut(pixels, lut), (pixels.shape[0],pixels.shape[1]))
+
+window_width = 700
+window_level = 2000
+
+lut = make_lut(image.pixel_array, window_width, window_level, image.PhotometricInterpretation)
+image3 = np.reshape(apply_lut(pixels, lut), (pixels.shape[0],pixels.shape[1]))
 
 
 #%% stale, origin version, make pies

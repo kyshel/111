@@ -9,6 +9,7 @@ from torchvision import models
 
 import os 
 import numpy as np
+import random
  
 env_inspect = "ECH_INSPECT"
 
@@ -21,6 +22,7 @@ if repro_flag not in os.environ:
 seed = int(os.environ[repro_seed])
 if os.environ[repro_flag] == '1':
     os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+    random.seed(seed)
     torch.manual_seed(seed)
     np.random.seed(seed)
     if version.parse(torch.__version__) >= version.parse("1.8.0"):
