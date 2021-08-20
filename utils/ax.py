@@ -189,6 +189,11 @@ def ins(v):
     print("ins<<<")
 
 
+
+
+
+
+
 def save_obj(obj1, fp='tmp_obj.pkl',silent = 0):
     if not silent: print('saving obj to ' + fp)
     with open(fp, 'wb') as handle:
@@ -206,6 +211,9 @@ def load_obj(filename='tmp_obj.txt', silent = 0):
     pass
 
 
+# alias
+save = save_obj
+load = load_obj
 
 
 

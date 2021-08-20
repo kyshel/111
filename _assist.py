@@ -47,8 +47,8 @@ matplotlib.style.use('dark_background')
 def c1to3(a):
     return  np.repeat(np.expand_dims(a, axis=2),3,axis = 2)
 
-def c3to1(pix):
-    return pix[:,:,0]
+def c3to1(pix,index = 0): # HWC
+    return pix[:,:,index]
 
 def rot270(a):
     return np.rot90(np.rot90(np.rot90(a)))
@@ -59,9 +59,6 @@ def rot180(a):
 def rot90(a):
     return  np.rot90(a)    
 
-def rot0(a):
-    return a
-
 def resize(im_np,size):
     return np.asarray(T.Resize(size=size)(Image.fromarray(im_np)))
 
@@ -71,17 +68,17 @@ def gray_rm(im_np):
 def gray_rm(im_np):
     return np.asarray( Image.fromarray(im_np).convert('L')  )
 
-def gray(im_np,is_round = False):
-    if im_np.ndim == 2:
-        return  im_np
+def gray(pix,is_round = False):
+    if pix.ndim == 2:
+        return  pix
     else:
-        im2 =np.zeros([im_np.shape[0],im_np.shape[1]])
-        for i,r in enumerate(im_np):
+        pix_gray =np.zeros([pix.shape[0],pix.shape[1]])
+        for i,r in enumerate(pix):
             for j,v in enumerate(r):
                 # R * 299/1000 + G * 587/1000 + B * 114/1000
-                im2[i][j] = v[0]* 299/1000 + v[1]* 587/1000 + v[2]* 114/1000 
-                if   is_round :  im2[i][j]  = round(im2[i][j]  )
-        return  im2
+                pix_gray[i][j] = v[0]* 299/1000 + v[1]* 587/1000 + v[2]* 114/1000 
+                if   is_round :  pix_gray[i][j]  = round(pix_gray[i][j])
+        return  pix_gray
 
 def hist(input_2d,bins = 'auto'):
     y, x = np.histogram(input_2d.ravel(), bins=bins)
@@ -94,10 +91,7 @@ def mesh(pix_input,size = None,surface = None ):
     # show mesh, pix gray must 1 channel
     if size is None: size = pix_input.shape[0] , pix_input.shape[1]
 
-    # print(pix_input.max())
     pix = resize(pix_input,size)
-    # print(pix.max())  # will decay
-
     a = np.arange(0, pix.shape[0])
     X, Y = np.meshgrid(a, a)
     Z = rot270(gray(pix))   # surface, 1 channel
@@ -106,16 +100,11 @@ def mesh(pix_input,size = None,surface = None ):
     deno = pix.max() - pix.min()
     c = rot270(c1to3(pix) if pix.ndim == 2 else pix)/deno     # color , 3 channel 
 
-
     ipv.figure()
-    
     # mesh = ipv.plot_mesh(Y,X,Z,    wireframe=True,color=c )
     ipv.plot_wireframe(Y,X,Z, color=c)
     ipv.show()
     ipv.style.set_style_dark()
-
-
-
 
 
 def dcm2pix_v2(dcm_raw_pix):
@@ -126,10 +115,8 @@ def dcm2pix_v2(dcm_raw_pix):
     raw_cut = raw - np.min(raw)
     uni_cut = uni - np.min(uni)
 
-
     raw_dot = raw_cut / np.max(raw_cut)
     uni_dot = uni_cut / np.max(uni_cut)
-
 
     return raw,raw_cut,uni_cut,raw_dot,uni_dot
 
@@ -144,23 +131,8 @@ def dcm2pix(fp):
     raw_cut = raw - np.min(raw)
     uni_cut = uni - np.min(uni)
 
-    # raw_cut_max = 0.000001 if np.max(raw_cut) == 0 else np.max(raw_cut)
-    # uni_cut_max = 0.000001 if np.max(raw_cut) == 0 else np.max(raw_cut)
-
     raw_dot = raw_cut / np.max(raw_cut)
     uni_dot = uni_cut / np.max(uni_cut)
-
-    # print(f'raw: min {raw.min(): <8} max {raw.max(): <8}')
-    # print(f'raw_cut: min {raw_cut.min(): <8} max {raw_cut.max(): <8}')
-    # print(f'uni_cut: min {uni_cut.min(): <8} max {uni_cut.max(): <8}')
-    # print(f'raw_dot: min {raw_dot.min(): <8} max {raw_dot.max(): <8}')
-    # print(f'uni_dot: min {uni_dot.min(): <8} max {uni_dot.max(): <8}')
-
-    # hist(raw)
-    # hist(raw_cut)
-    # hist(uni_cut)
-    # hist(raw_dot)
-    # hist(uni_dot)
 
     return raw,raw_cut,uni_cut,raw_dot,uni_dot
 
@@ -170,54 +142,25 @@ def pix2file(pix,dst_fp,do_norm = False,is_norm = False):
     if do_norm: pix = (norm(pix) * 255).astype(np.uint8)
     if is_norm: pix = (pix* 255).astype(np.uint8)
  
-    im = Image.fromarray(pix) # np > im
+    im = Image.fromarray(pix) 
     im.save(dst_fp)
 
-def seepix(pix,do_norm = False, is_norm = False): 
+def seepix_RM(pix,do_norm = False, is_norm = False):  # should use more 
     if do_norm: pix = (norm(pix) * 255).astype(np.uint8)
     if is_norm: pix = (pix* 255).astype(np.uint8)
 
-    im = Image.fromarray(pix) # np > im 
+    im = Image.fromarray(pix) 
     im.show()
 
-def norm(pix):
-    return pix / pix.max()
-
-def dcms2pie(dcms_fp,dst_fp = None,pbar=None): 
-    if 'HALT' in vars() or 'HALT' in globals(): # stop multi-threads
-        if HALT: return 
-
-    dcm_files = sorted(
-                glob.glob(os.path.join(dcms_fp,"*.dcm")), 
-                key=lambda x: int(x[:-4].split("-")[-1]),
-            )
-
-    raw,raw_cut,uni_cut,raw_dot,uni_dot = dcm2pix(dcm_files[0])
+def seepix(pix,do_norm = False,is_norm = False):
+    pix2im(pix,do_norm,is_norm).show()
     
-    pie = np.zeros(raw.shape)
-    for f in dcm_files:
-        raw,raw_cut,uni_cut,raw_dot,uni_dot = dcm2pix(f)
-        
-        pie += raw  # must raw here, 1 pie should has same scale 
 
-    if dst_fp is not None: # make file
-        pix2file(pie,dst_fp,do_norm=True) 
-
-    if pbar:
-        pbar.update(1)
-
-    return pie
-
- 
+def norm(pix):
+    ma, mi = pix.max(), pix.min()
+    return (pix - mi) / (ma - mi)
 
 
-
-
-from tqdm import tqdm
-
-SEQS = ['FLAIR' , 'T1w' , 'T1wCE' , 'T2w']
-HALT = False
- 
 def read_pie(pie_dir, pbar = None):
     if 'HALT' in vars() or 'HALT' in globals(): # stop multi-threads
         if HALT: return 
@@ -231,15 +174,14 @@ def read_pie(pie_dir, pbar = None):
     for fp in dcm_files:
         dcm = pydicom.read_file(fp)
         pie += [[fp, pydicom.read_file(fp) ]]  # [fp,dcm], ...
-        # pie +=  fp, pydicom.read_file(fp)    # [fp,dcm], ...
 
     if pbar:
         pbar.update(1)
 
     return pie 
 
-# step1 make dcms 
-def read_pies(input_dir,cache_dir= '_pies_cache', workers=8):
+ 
+def cache_pies(input_dir,cache_dir= '_pies_cache', workers=8):
     
     # pie dirs
     pie_dirs = {seq:[] for seq in SEQS} # seq: [ pie_dir, pie_dir  ] a pie has many dcms 
@@ -273,9 +215,37 @@ def read_pies(input_dir,cache_dir= '_pies_cache', workers=8):
 
     print(f'read_pies all done! check f{cache_dir}')
 
+def make_nob(pie):
+    # make nob
+    kop = 0
+    for fp,dcm in pie:  # .dcm  
+        raw = dcm.pixel_array
+        lut = apply_voi_lut(raw, dcm) if 0 else raw    
+        uni = np.amax(lut) - lut  if dcm.PhotometricInterpretation == "MONOCHROME1" else lut
+
+        raw_cut = raw - np.min(raw)
+        uni_cut = uni - np.min(uni)
+
+        raw_dot = raw_cut / np.max(raw_cut) if  np.max(raw_cut) != 0 else raw_cut + 0.0
+        uni_dot = uni_cut / np.max(uni_cut) if  np.max(uni_cut) != 0 else uni_cut + 0.0
+
+        # >>>>>>>>>>>>>>>>>>>>>   core <<<<<<<<<<<<<<<<<<<<<
+        # final = dot2pix(kop2rgb(uni_cut,[0.4,0.6], ))
+        final = uni_dot
+
+        # print(final.max() )
+        kop += final  #  core
+
+    fp = pie[0][0] # should be pie[0][0] after fix 
+    segs = fp.split(os.sep)  # [...,'01raw', 'd', -4'train', -3'00466', -2'FLAIR', -1'0.dcm']
+    split,fn,seq = segs[-4], f'{segs[-3]}.png', segs[-2]
+    dst_fp = os.path.join(dst_dir,seq,split,fn)
+
+    return kop,dst_fp
+
 
 def make_nobs(input_dir,cache_dir,dst_dir,workers=16,chunksize = 1):  
-    # make nobs to write pngs
+    # make nobs, write pngs
 
     # mkdir and prepare labels.csv
     for seq in SEQS:
@@ -302,149 +272,128 @@ def make_nobs(input_dir,cache_dir,dst_dir,workers=16,chunksize = 1):
         pbar.close()
 
         ax.save_obj(nobs,os.path.join(cache_dir,f'nobs_{seq}.pkl'))
+
         # write nobs
-        for pix,dst_fp in tqdm(nobs,desc=f'writing nobs to {dst_dir}'):
-            pix = kop2rgb2pix(pix,[0.90,0.95]) 
-            pix2file(pix,dst_fp,do_norm=1)
+        for kop,dst_fp in tqdm(nobs,desc=f'writing nobs to {dst_dir}'):
+            # pix = kop2rgb2pix(kop,[0.90,0.95])  # core
+            dot = scale(kop,[0.4,0.95]) 
+            pix2file(dot,dst_fp,is_norm=1)
 
         del pies, nobs, pbar, results
 
     print(f'All Done! Check {dst_dir}')
 
 
-def pix2im(pix,do_norm = False,is_norm = False,is_expand = False):
+# tools 
+def pix2im(pix,do_norm = False,is_norm = False ):
     if do_norm and is_norm: raise Exception('do_norm and is_norm can not co-exist')
     if do_norm: pix = (norm(pix) * 255).astype(np.uint8)
-    if is_norm: pix = (pix* 255).astype(np.uint8)
+    if is_norm: pix = (pix* 255).astype(np.uint8) # PIL can read normed 
  
     im = Image.fromarray(pix) # np > im
     return im
 
 
-#%% lab, read bad imgs 
-def make_nob(pie,workers=16,chunksize = 3):
-    # make nob
-    kop = 0
-    for fp,dcm in pie:  # .dcm  
-        raw = dcm.pixel_array
-        lut = apply_voi_lut(raw, dcm)   
-        uni = np.amax(lut) - lut  if dcm.PhotometricInterpretation == "MONOCHROME1" else lut
-
-        raw_cut = raw - np.min(raw)
-        uni_cut = uni - np.min(uni)
-
-        raw_dot = raw_cut / np.max(raw_cut) if  np.max(raw_cut) != 0 else raw_cut + 0.0
-        uni_dot = uni_cut / np.max(uni_cut) if  np.max(uni_cut) != 0 else uni_cut + 0.0
-
-        # >>>>>>>>>>>>>>>>>>>>>   core <<<<<<<<<<<<<<<<<<<<<
-        # final = dot2pix(kop2rgb(uni_cut,[0.4,0.6], ))
-        final = uni_dot
-
-        # print(final.max() )
-        kop += final  #  core
-
-    fp = pie[0][0] # should be pie[0][0] after fix 
-    segs = fp.split(os.sep)  # [...,'01raw', 'd', -4'train', -3'00466', -2'FLAIR', -1'0.dcm']
-    split,fn,seq = segs[-4], f'{segs[-3]}.png', segs[-2]
-    dst_fp = os.path.join(dst_dir,seq,split,fn)
-
-    return kop,dst_fp
-
-def scale(x, horizon = None, peak = None):   
-    m = horizon if horizon is not None else x.min()  # horizon maybe equal to 0
-    n = peak if peak is not None else x.max()
-    return (x-m)/(n-m)
 
 def dot2pix(x):
     return ( x * 255.999).astype(np.uint8)
 
 def kop2pix(x):
-    return dot2pix(scale(x))
+    return dot2pix(norm(x))
 
 def kop2rgb_v1(kop,seg=[0.6,0.9], horizon = None, peak = None ): 
     # Warning: no rgba include
     # kop = c1to3(kop) if kop.ndim == 2 else (kop )
-
-    dot = scale(kop, horizon = None, peak = None)
+    dot = norm(kop)
     m,n = seg #  1,R,n,G,m,B,0    [0.9,1] [0.6,0.9] [0.3,0.6]
- 
     r = np.where( np.logical_and(n < dot , dot <= 1 ), dot, n)
-    r = scale(r,n,1)
-
+    r = norm(r) #scale(r,n,1)
     g = np.where( np.logical_and(m < dot , dot <= n ), dot , m)
-    g = scale(g,m,n)
-
+    g = norm(g) #scale(g,m,n)
     b = np.where( np.logical_and(0 <= dot , dot <= m ), dot, 0)
-    b = scale(b,0,m)
-
+    b = norm(b) #scale(b,0,m)
     return np.dstack((r,g,b))
 
 
-def kop2rgb(kop,seg=[0.6,0.9], horizon = None, peak = None ): 
+def kop2rgb_dot(kop,seg=[0.6,0.9], horizon = None, peak = None ): 
     # v2, 0.9 0.95  
-
-    dot = scale(kop, horizon = None, peak = None)
+    dot = norm(kop )
     m,n = seg #  1,R,n,G,m,B,0    [0.9,1] [0.6,0.9] [0.3,0.6]
- 
     r = np.where( np.logical_and(n < dot , dot <= 1 ), dot, n)
-    r = scale(r,n,1)
-
+    r = norm(r,n,1)
     g = np.where( np.logical_and(m < dot , dot <= n ), dot , m)
-    g = scale(g,m,n)
+    g = norm(g,m,n)
 
     b = dot
 
     return np.dstack((r,g,b))
 
 
+def kop2rgb_pix(x,seg=[0.6,0.9]):
+    return dot2pix(kop2rgb_dot(x,seg))
 
-def kop2rgb2pix(x,seg=[0.6,0.9]):
-    return dot2pix(kop2rgb(x,seg))
+def scale(kop,seg =[0.0,1.0] ):
+    dot = norm(kop)
+    x,y = seg
+    dot = np.where( dot>=y, y, dot)
+    dot = np.where( dot<=x, x, dot)
+    dot = norm(dot)
+    return dot
 
-
-
-dst_dir = '/ap/27bra/03png_pie2'
+    
+# const
+input_dir = '/ap/27bra/01raw/d/'
+cache_dir = '_pies_cache'
+dst_dir = '/ap/27bra/03png_pie'
 yes = ['00000','00002','00005','00006','00008','00011','00012','00014','00020','00025','00026','00028','00031','00033','00035','00043','00046','00048','00052','00054','00056','00058','00059','00060','00062','00063','00066','00068','00070','00071','00074','00077','00078','00085','00087','00089','00094','00096','00098','00100','00105','00106','00107','00109','00117','00120','00128','00134','00136','00138','00139','00140','00143','00144','00146','00155','00156','00159','00160','00166','00171','00177','00178','00185','00186','00187','00188','00196','00197','00199','00203','00204','00210','00212','00220','00222','00230','00233','00234','00235','00240','00245','00246','00250','00253','00254','00260','00263','00270','00271','00273','00281','00282','00284','00285','00291','00293','00294','00296','00299','00303','00304','00305','00306','00311','00313','00317','00321','00322','00328','00329','00331','00332','00334','00338','00340','00344','00350','00352','00359','00360','00364','00366','00367','00369','00370','00371','00383','00386','00400','00403','00404','00406','00408','00409','00413','00416','00425','00426','00429','00431','00436','00440','00442','00443','00449','00451','00456','00457','00466','00468','00470','00472','00478','00479','00480','00483','00485','00488','00491','00493','00494','00499','00500','00501','00502','00504','00505','00506','00511','00513','00516','00517','00520','00523','00524','00525','00526','00528','00529','00532','00537','00539','00542','00543','00544','00548','00549','00550','00551','00552','00554','00556','00557','00558','00559','00561','00564','00570','00576','00577','00579','00582','00583','00584','00586','00590','00593','00594','00597','00598','00599','00602','00604','00606','00607','00608','00610','00611','00612','00613','00615','00618','00621','00622','00625','00626','00628','00631','00638','00639','00640','00646','00650','00652','00655','00656','00658','00659','00661','00674','00675','00676','00677','00679','00680','00690','00691','00692','00693','00694','00697','00698','00704','00705','00707','00708','00714','00715','00716','00718','00725','00731','00732','00736','00737','00739','00740','00746','00750','00757','00758','00760','00765','00768','00772','00773','00775','00777','00781','00782','00784','00787','00789','00791','00793','00794','00795','00801','00807','00808','00811','00816','00819','00823','00828','00838','00840','00998','00999','01000','01001','01002','01003','01005','01007','01008',]
-
-
-
 no = ['00003','00009','00017','00018','00019','00021','00022','00024','00030','00032','00036','00044','00045','00049','00053','00061','00064','00072','00081','00084','00088','00090','00095','00097','00099','00102','00104','00108','00110','00111','00112','00113','00116','00121','00122','00123','00124','00130','00132','00133','00137','00142','00147','00148','00149','00150','00151','00154','00157','00158','00162','00165','00167','00169','00170','00172','00176','00183','00184','00191','00192','00193','00194','00195','00201','00206','00209','00211','00214','00216','00217','00218','00219','00221','00227','00228','00231','00236','00237','00238','00239','00241','00242','00243','00247','00249','00251','00258','00259','00261','00262','00266','00267','00269','00274','00275','00280','00283','00286','00288','00289','00290','00297','00298','00300','00301','00308','00309','00310','00312','00314','00316','00318','00320','00324','00325','00327','00336','00339','00341','00343','00346','00347','00348','00349','00351','00353','00356','00373','00376','00377','00378','00379','00380','00382','00387','00388','00389','00390','00391','00392','00395','00397','00399','00401','00402','00405','00407','00410','00412','00414','00417','00418','00419','00421','00423','00430','00432','00433','00441','00444','00445','00446','00452','00454','00455','00459','00464','00469','00477','00481','00495','00496','00498','00507','00510','00512','00514','00518','00519','00530','00533','00538','00540','00545','00547','00555','00563','00565','00567','00568','00569','00571','00572','00574','00575','00578','00581','00587','00588','00589','00591','00596','00601','00605','00616','00619','00620','00623','00624','00630','00636','00641','00642','00645','00649','00651','00654','00657','00663','00667','00668','00682','00683','00684','00685','00686','00687','00688','00703','00706','00709','00723','00724','00727','00728','00729','00730','00733','00734','00735','00742','00744','00747','00751','00753','00756','00759','00764','00767','00774','00778','00780','00788','00792','00796','00797','00799','00800','00802','00803','00804','00805','00806','00809','00810','00814','00818','00820','00824','00830','00834','00836','00837','00839','01004','01009','01010',]
-
-
-
 SEQS = ['FLAIR' , 'T1w' , 'T1wCE' , 'T2w']
-for seq in SEQS:
-    # multi dcms squash to nob
-    pie = read_pie(f'/ap/27bra/01raw/d/train/{yes[0]}/{seq}')
-    # print(pie[0][1].pixel_array)
-    kop,dst_fp = make_nob(pie)
-    pix = kop2pix(kop)
-    # pix = kop2rgb2pix(kop,[0.90,0.95]) 
-    im = pix2im(pix )
-    im.show()
 
-print('ok!')
+#%% lab  
 
 
-# # single dcm 
+
+# pie 
+pie = read_pie(f'/ap/27bra/01raw/d/train/{no[9]}/{SEQS[1]}') if 1 else pie
+kop,_fp = make_nob(pie)
+# seepix(kop,is_norm=1)
+dot = scale(kop,[0.4,0.95]); seepix(dot,is_norm=1); mesh(dot,32)
+
+
+
+
+# single dcm 
 # raw,raw_cut,uni_cut,raw_dot,uni_dot = \
 #     dcm2pix(f'/ap/27bra/01raw/d/train/00000/FLAIR/Image-250.dcm')
 
 # pix = kop2pix(raw)
 # # pix = kop2rgb2pix(uni_cut,[0.3,0.7])
-# im = pix2im(pix)
-# im.show()
+# seepix(pix)
+
 
 print(111)
 
 
 # %% make_pie v2
 
-input_dir = '/ap/27bra/01raw/d/'
-cache_dir = '_pies_cache'
-dst_dir = '/ap/27bra/03png_pie2'
+
 # read_pies(input_dir,cache_dir, workers=16) # ONCE!
-# make_nobs(input_dir,cache_dir,dst_dir,workers=16,chunksize=3)
+make_nobs(input_dir,cache_dir,dst_dir,workers=16,chunksize=3)
+
+
+
+
+#%% hhh hyperplane 
+
+
+
+
+# stale
+# def scale_RM(x, horizon = None, peak = None):   # no use, wrong def
+#     m = horizon if horizon is not None else x.min()  # horizon maybe equal to 0
+#     n = peak if peak is not None else x.max()
+#     return (x-m)/(n-m)
+
 
 
 
@@ -502,19 +451,19 @@ def get_metadata_from_dicom(img_dicom):
     }
     return {k: get_first_of_dicom_field_as_int(v) for k, v in metadata.items()}
 
-def window_image_RM(img, window_center, window_width, intercept = 0, slope = 1):
+def window_image(img, window_center, window_width, intercept = 0, slope = 1):
     img = img * slope + intercept
-    img_min = window_center - window_width / 2
-    img_max = window_center + window_width / 2
+    img_min = window_center - window_width // 2
+    img_max = window_center + window_width // 2
     img[img < img_min] = img_min
     img[img > img_max] = img_max
     return img 
 
-def window_image(dot, window_center, window_width, intercept = 0, slope = 1):
+def window_image_dot(dot, window_center, window_width, intercept = 0, slope = 1):
     img = dot 
     img = img * slope + intercept
-    img_min = window_center - window_width / 2
-    img_max = window_center + window_width / 2
+    img_min = window_center - window_width // 2
+    img_max = window_center + window_width // 2
     img[img < img_min] = 0
     img[img > img_max] = 1
     dot =img
@@ -532,7 +481,7 @@ def normalize_minmax(img):
     mi, ma = img.min(), img.max()
     return (img - mi) / (ma - mi)
 
-def prepare_image(img_path):
+def prepare_image_rm(img_path):
     img_dicom = pydicom.read_file(img_path)
     img_id = get_id(img_dicom)
     
@@ -561,15 +510,15 @@ def prepare_image(img_path):
     
     # img = window_image(img,1500,400,0,1)  # rewindow
     # img = normalize_minmax(img) * 255
-    dot = scale(dot,0,1)
+    dot = norm(dot )
     pix = dot*255
      
     img = PIL.Image.fromarray(pix.astype(np.int8), mode="L")
     
     return img_id, img
 # /ap/27bra/01raw/d/train/00006/T2w/Image-200.dcm          /ap/27bra/01raw/d/train/00000/FLAIR/Image-250.dcm
-id,im = prepare_image(f'/ap/27bra/01raw/d/train/00006/T1w/Image-10.dcm')
-im.show()
+# id,im = prepare_image(f'/ap/27bra/01raw/d/train/00006/T1w/Image-10.dcm')
+# im.show()
 
 #%% lab histo 
 %matplotlib inline
@@ -733,6 +682,32 @@ import shutil
 from tqdm import tqdm 
 import multiprocessing.dummy as mp 
 from itertools import repeat
+
+
+def dcms2pie(dcms_fp,dst_fp = None,pbar=None): 
+    if 'HALT' in vars() or 'HALT' in globals(): # stop multi-threads
+        if HALT: return 
+
+    dcm_files = sorted(
+                glob.glob(os.path.join(dcms_fp,"*.dcm")), 
+                key=lambda x: int(x[:-4].split("-")[-1]),
+            )
+
+    raw,raw_cut,uni_cut,raw_dot,uni_dot = dcm2pix(dcm_files[0])
+    
+    pie = np.zeros(raw.shape)
+    for f in dcm_files:
+        raw,raw_cut,uni_cut,raw_dot,uni_dot = dcm2pix(f)
+        
+        pie += raw  # must raw here, 1 pie should has same scale 
+
+    if dst_fp is not None: # make file
+        pix2file(pie,dst_fp,do_norm=True) 
+
+    if pbar:
+        pbar.update(1)
+
+    return pie
 
 def make_pies(input_dir,dst_dir,labels_csv_name = 'train_labels.csv',workers = 16):
     cohorts = ['FLAIR' , 'T1w' , 'T1wCE' , 'T2w']

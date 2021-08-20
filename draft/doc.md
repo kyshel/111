@@ -4,6 +4,7 @@ embrace the change, do the thing that challenge
 
 # workflow
 - augument image by limiting window 
+- split pkls to boost load speed 
 
 
 
@@ -26,10 +27,9 @@ model: resnet18
 
  
 # some thoughts to 27bra
-
 - main split
-way1, nob > expand
-way2, dcm > expand > pie  # should better 
+way1, nob > window
+way2, dcm > window > pie  # should better 
  
 - tumor is a part in the pic, not the whold image can treat like classical image
 need some technique that focus on the tumor
@@ -45,6 +45,7 @@ pie ok
 - improve multi thread
 
 # p9
+- write self-define softmax in range[0,1] and can scale
 - png 3 channel sample, view the tumor range 
 - try directly crop little 
 - chop edges very high
