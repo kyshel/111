@@ -30,6 +30,7 @@ from torchvision.datasets.vision import VisionDataset
 from torch.utils.data import random_split
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.transforms.functional as VTF
 import torch.optim as optim
 from tqdm import tqdm 
 from torch.optim import lr_scheduler
@@ -71,6 +72,16 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # %% functions
+
+class SquarePad:
+    # https://discuss.pytorch.org/t/how-to-resize-and-pad-in-a-torchvision-transforms-compose/71850/10
+    def __call__(self, image):
+        max_wh = max(image.size)
+        p_left, p_top = [(max_wh - s) // 2 for s in image.size]
+        p_right, p_bottom = [max_wh - (s+pad) for s, pad in zip(image.size, [p_left, p_top])]
+        padding = (p_left, p_top, p_right, p_bottom)
+        return VTF.pad(image, padding, 0, 'constant')
+
 
 def seed_worker(worker_id):
     worker_seed = torch.initial_seed() % 2**32
@@ -512,8 +523,12 @@ logger.info(opt)
 # Save run settings
 # with open(save_dir / 'hyp.yaml', 'w') as f:
 #     yaml.safe_dump(hyp, f, sort_keys=False)
-with open(save_dir / 'opt.yaml', 'w') as f:
+with open(save_dir / 'opt.yaml', 'w') as f: # save opt
     yaml.safe_dump(vars(opt), f, sort_keys=False)
+with open(__file__) as f: src_code = f.read() 
+with open(save_dir / 'train.py', "w") as text_file: # save source code
+    text_file.write(src_code)
+
 
 
 # gpu  
@@ -553,16 +568,22 @@ except Exception:
 
 train_mean, train_std = [0.5234, 0.5234, 0.5234], [0.2165, 0.2165, 0.2165] # 21cov
 test_mean, test_std = [0.5213, 0.5213, 0.5213], [0.2199, 0.2199, 0.2199]
+
+# 27bra_windowed_gray [0.4,0.95]
+# train_mean, train_std = [0.1042, 0.1042, 0.1042], [0.223, 0.223, 0.223]
+# test_mean, test_std = [0.1016, 0.1016, 0.1016], [0.2204, 0.2204, 0.2204]
+
 center_crop_ratio = 0.9
 random_crop_ratio = 0.8
 random_crop_size = (int(opt.img_size[0]*random_crop_ratio),
     int(opt.img_size[1]*random_crop_ratio))
 transform_train = transforms.Compose([
     # transforms.RandomAutocontrast(),  # not work in 1.7.0
+    SquarePad(),
     transforms.Resize(opt.img_size),
     transforms.CenterCrop(int(opt.img_size[0]*center_crop_ratio)),
-    # T.RandomHorizontalFlip(p=0.5),
-    # transforms.RandomCrop(size=random_crop_size),
+    T.RandomHorizontalFlip(p=0.5),
+    transforms.RandomCrop(size=random_crop_size),
     # T.AutoAugment(T.AutoAugmentPolicy.CIFAR10),
     transforms.ToTensor(), 
     transforms.Normalize(train_mean,train_std),
@@ -570,16 +591,6 @@ transform_train = transforms.Compose([
     ])
 
 transform_test = transform_train
-# transform_test = transforms.Compose([
-#     # transforms.RandomAutocontrast(),   # not work in 1.7.0
-    
-#     transforms.Resize(opt.img_size),
-#     transforms.CenterCrop(int(opt.img_size[0]*center_crop_ratio)),
-#     T.RandomHorizontalFlip(p=0.5),
-#     transforms.RandomCrop(size=random_crop_size),
-#     # T.AutoAugment(T.AutoAugmentPolicy.CIFAR10),
-#     transforms.ToTensor(),
-#     transforms.Normalize(test_mean, test_std)])
 transform_mean_and_std = transforms.Compose([
     transforms.Resize(opt.img_size),
     transforms.ToTensor(),])

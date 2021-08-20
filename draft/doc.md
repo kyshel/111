@@ -1,10 +1,9 @@
-
 # 0819
 embrace the change, do the thing that challenge
 
 # workflow
 - augument image by limiting window 
-- split pkls to boost load speed 
+- save pkls every nob, to boost load speed 
 
 
 
