@@ -579,11 +579,11 @@ random_crop_size = (int(opt.img_size[0]*random_crop_ratio),
     int(opt.img_size[1]*random_crop_ratio))
 transform_train = transforms.Compose([
     # transforms.RandomAutocontrast(),  # not work in 1.7.0
-    SquarePad(),
+    SquarePad(), # after sqauare, min size is 256
     transforms.Resize(opt.img_size),
     transforms.CenterCrop(int(opt.img_size[0]*center_crop_ratio)),
-    T.RandomHorizontalFlip(p=0.5),
-    transforms.RandomCrop(size=random_crop_size),
+    # T.RandomHorizontalFlip(p=0.5),
+    # transforms.RandomCrop(size=random_crop_size),
     # T.AutoAugment(T.AutoAugmentPolicy.CIFAR10),
     transforms.ToTensor(), 
     transforms.Normalize(train_mean,train_std),
